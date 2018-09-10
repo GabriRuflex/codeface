@@ -30,6 +30,7 @@ from codeface.logger import set_log_level, start_logfile, log
 from codeface.configuration import Configuration
 from codeface.util import execute_command
 from codeface.project import project_analyse, mailinglist_analyse, conway_analyse
+from codeface.issueanalyzer.issueanalyzer_handler import IssueAnalyzer
 
 def get_parser():
     parser = argparse.ArgumentParser(prog='codeface',
@@ -43,6 +44,23 @@ def get_parser():
                 help='Number of cores to use in parallel')
 
     sub_parser = parser.add_subparsers(help='select action')
+    ia_parser = sub_parser.add_parser('ia', help='Run "Issue Analyzer"')
+    ia_parser.set_defaults(func=cmd_ia)
+    ia_parser.add_argument('-c', '--config', required=True,
+                           help="Codeface configuration file", default='codeface.conf')
+    ia_parser.add_argument('-p', '--project', required=True,
+                           help='Project configuration file')
+    ia_parser.add_argument('-dir', '--directory', help='Cache directory')
+    ia_parser.add_argument('-ddb', '--dropDatabase', action='store_true',
+                           help='Drop database', default=False)
+    ia_parser.add_argument('-ao', '--analyzeOnly', action='store_true',
+                           help='Analyze only, without scratching', default=False)
+    ia_parser.add_argument('-so', '--scratchOnly', action='store_true',
+                           help='Scratch only, without analyzing', default=False)
+    ia_parser.add_argument('-dco', '--deleteCacheOnly', action='store_true',
+                           help='Delete cache only', default=False)
+    ia_parser.add_argument('-l', '--logpath', help='Log path')
+
     test_parser = sub_parser.add_parser('test', help='Run tests')
     test_parser.set_defaults(func=cmd_test)
     test_parser.add_argument('-c', '--config', help="Codeface configuration file",
@@ -175,6 +193,29 @@ def cmd_dynamic(args):
     Rcode = "library(shiny); runApp(host='0.0.0.0', port={})".format(args.port)
     cmd = ["Rscript", "-e", Rcode, "-c", cfg]
     execute_command(cmd, direct_io=True, cwd=cwd)
+
+def cmd_ia(args):
+    log.info("Parsing issue analyzer's command line arguments")
+
+    # Calculate the absolute paths
+    codefaceConfig = os.path.abspath(args.config)
+    iaProject = os.path.abspath(args.project)
+
+    cacheDirectory = None
+    if not args.directory is None:
+        cacheDirectory = os.path.abspath(args.directory)
+
+    logPath = None
+    if not args.logpath is None and (os.path.isfile(args.logpath) or
+                                     not os.path.exists(args.logpath)):
+        logPath = os.path.abspath(args.logpath)
+
+    # Get user preferences
+    flags = [args.dropDatabase, args.scratchOnly, args.analyzeOnly, args.deleteCacheOnly]
+
+    # Call the issue analyzer handler
+    issueAnalyzer = IssueAnalyzer(codefaceConfig, iaProject, cacheDirectory, flags, logPath, args.jobs)
+    issueAnalyzer.handle()
 
 def cmd_test(args):
     '''Sub-command handler for the ``test`` command.'''

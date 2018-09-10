@@ -22,6 +22,8 @@ from datetime import datetime
 from logging import getLogger;
 from contextlib import contextmanager
 
+import codeface.issueanalyzer.common_utils as utils
+
 # create logger
 log = getLogger(__name__)
 
@@ -408,6 +410,241 @@ class DBManager:
         # Return the ids of the release ranges we have to process
         return new_ranges_to_process
 
+    def get_issue_project(self, url, name, p1, p2, recreateIfExist = False):
+        """
+        Return the project ID of the given url/name combination.
+        If the project does not exist yet in the database, it is created.
+        """
+        # Check if project already exists
+        self.doExec("SELECT projectId FROM issue_project WHERE url=%s AND name=%s;", (url, name))
+        if self.cur.rowcount > 0:
+            if recreateIfExist == False:
+                # Just return the project ID
+                return self.doFetchAll()[0][0]
+            else:
+                # Drop data in database of the current project
+                self.reset_issue_database(self.doFetchAll()[0][0])
+        
+        # Create a new project
+        self.doExecCommit("INSERT INTO issue_project (url, name, priorityField1, priorityField2) "
+                          "VALUES (%s, %s, %s, %s)", (url, name, p1, p2))
+        self.doExec("SELECT projectId FROM issue_project WHERE url=%s AND name=%s;", (url, name))
+        pid = self.doFetchAll()[0][0]
+
+        return pid
+
+    def add_issue_data(self, issue_data):
+        """
+        Add an issue of the project.
+        """        
+        try:
+            self.doExecCommit("INSERT INTO issue_data "
+                              "(issueId, projectId, summary, component, creationTime, creator, assignedTo, spentTime, priority, priorityValue, "
+                              "severity, severityValue, status, resolution, isOpen, votes, commentCount, keywords, lastResolved) "
+                              "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", issue_data)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting issue data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting issue data")
+        return
+
+    def add_issue_developer(self, issue_developer):
+        """
+        Add a developer of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_developer "
+                      "(name, projectId, developerId, realName) "
+                      "VALUES (%s, %s, %s, %s)", issue_developer)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting developer data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting developer data")
+        return
+
+    def add_issue_attachment(self, issue_attachment):
+        """
+        Add an attachment related to an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_attachment "
+                      "(attachmentId, projectId, issueId, creator, creationTime, isObsolete, isPatch, isPrivate, size, positiveReviews) "
+                      "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", issue_attachment)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting attachment data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting attachment data")
+        return
+
+    def add_issue_cclist(self, issue_cclist):
+        """
+        Add a list of developers following an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_cclist "
+                      "(issueId, projectId, developerName) "
+                      "VALUES (%s, %s, %s)", issue_cclist)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting CC developers data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting CC developers data")
+        return
+
+    def add_issue_comment(self, issue_comments):
+        """
+        Add a comment related to an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_comment "
+                      "(commentId, projectId, issueId, author, time, rawText) "
+                      "VALUES (%s, %s, %s, %s, %s, %s)", issue_comments)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting comments data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting comments data")
+        return
+
+    def add_issue_dependencies(self, issue_dependencies):
+        """
+        Add a dependency related to an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_dependencies "
+                              "(issueId, projectId, relatedIssueId, relationType) "
+                              "VALUES (%s, %s, %s, %s)", issue_dependencies)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting dependencies data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting dependencies data")
+        return
+
+    def add_issue_history(self, issue_history):
+        """
+        Add an history's change related to an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_history "
+                      "(issueId, projectId, who, time, added, removed, attachmentId, fieldName) "
+                      "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", issue_history)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting history data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting history data")
+        return
+
+    def add_issue_assignment(self, issue_assignment):
+        """
+        Add the assignee to an issue of the project.
+        """
+        try:
+            self.doExecCommit("INSERT INTO issue_assignment "
+                      "(issueId, projectId, developerName) "
+                      "VALUES (%s, %s, %s)", issue_assignment)
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when inseriting history data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when inseriting history data")
+        return
+
+    def get_data_stored(self, projectId):
+        """
+        Get the developers' assignment data related to the project.
+        """
+        issue_tables = dict()
+
+        sqlQuery = "select issueId, projectId, summary, component, creationTime, creator, assignedTo, priority, severity, " \
+                   "status, resolution, isOpen, votes, commentCount, keywords, lastResolved from issue_data where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["bugs"] = self.doFetchAll()
+
+        sqlQuery = "select name, realName, projectId, developerId  " \
+                   "from issue_developer where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["developers"] = self.doFetchAll()
+
+        sqlQuery = "select attachmentId, projectId, issueId, creator, creationTime, isObsolete, isPatch, isPrivate, size, positiveReviews " \
+                   "from issue_attachment where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["attachments"] = self.doFetchAll()
+
+        sqlQuery = "select commentId, projectId, issueId, author, time, rawText " \
+                   "from issue_comment where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["comments"] = self.doFetchAll()
+
+        sqlQuery = "select issueId, projectId, who, time, added, removed, attachmentId, fieldName " \
+                   "from issue_history where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["history"] = self.doFetchAll()
+
+        sqlQuery = "select issueId, projectId, relatedIssueId, relationType " \
+                   "from issue_dependencies where projectId = {}".format(projectId)
+        self.doExec(sqlQuery)
+        issue_tables["relations"] = self.doFetchAll()
+
+        return issue_tables
+
+    def get_view_assignment(self, projectId, queryType = 0):
+        """
+        Get the developers' assignment data related to the project.
+        """
+        sqlQuery = ""
+        if queryType == utils.QUERY_TYPE_ALL_ASSIGNMENTS:
+            sqlQuery = "SELECT * FROM view_assignment \
+                    WHERE projectId={}".format(projectId)
+        elif queryType == utils.QUERY_TYPE_ASSIGNMENTS_STATS:
+            sqlQuery = "select issueId, component, priority, severity, avg(issueAssigned) as 'avgIssueAssigned', avg(devAvgTime) as 'avgDevAvgTime', " \
+                    "avg(numCommentPosted) as 'avgNumCommentPosted', avg(numAttachmentPosted) as 'avgNumAttachmentPosted', " \
+                    "avg(positiveReviews), avg(sizeAttachmentPosted) from view_assignment where projectId = {} " \
+                    "GROUP BY issueId, component, priority, severity".format(projectId)
+        self.doExec(sqlQuery)
+        if self.cur.rowcount == 0:
+            log.debug("Data from project {} not found!".format(projectId))
+        return (self.cur)
+
+    def get_issue_developer_statistics(self, projectId, developerName):
+        """
+        Get the developers' statistics data related to the project.
+        """
+        self.doExec("select ifnull(sum(ic.spentTime), 0) as 'timeAvailable', ifnull(sum(io.spentTime), 0) as 'timeAssigned' from issue_data io, issue_data ic where io.assignedTo='{0}' and " \
+                    "ic.assignedTo='{0}' and io.isOpen=1 and ic.isOpen=0 and io.projectId={1} and ic.projectId={1}".format(developerName, projectId))
+        if self.cur.rowcount == 0:
+            log.debug("Data from project {} not found!".format(projectId))
+        return (self.cur)
+
+    def reset_issue_database(self, pid = ""):
+        """
+        Reset all the data stored on the database.
+        """
+        if pid == "":
+            sql_statement = "SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;" \
+                            "SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;" \
+                            "SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='TRADITIONAL,ALLOW_INVALID_DATES';" \
+                            "TRUNCATE codeface.issue_project;" \
+                            "TRUNCATE codeface.issue_data;" \
+                            "TRUNCATE codeface.issue_developer;" \
+                            "TRUNCATE codeface.issue_attachment;" \
+                            "TRUNCATE codeface.issue_cclist;" \
+                            "TRUNCATE codeface.issue_comment;" \
+                            "TRUNCATE codeface.issue_dependencies;" \
+                            "TRUNCATE codeface.issue_history;" \
+                            "TRUNCATE codeface.issue_developer_ranks_view;" \
+                            "TRUNCATE codeface.issue_bug_ranks_view;" \
+                            "SET SQL_MODE=@OLD_SQL_MODE;" \
+                            "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;" \
+                            "SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;"
+            self.doExec(sql_statement)
+        else:
+            sql_statement = str("DELETE FROM codeface.issue_project WHERE projectId = {pid};").format(pid=pid)
+            self.doExecCommit(sql_statement)
 
 def tstamp_to_sql(tstamp):
     """Convert a Unix timestamp into an SQL compatible DateTime string"""

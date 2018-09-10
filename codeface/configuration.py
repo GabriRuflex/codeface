@@ -46,7 +46,12 @@ class Configuration(Mapping):
                      'issueTrackerURL', 'issueTrackerProject',
                      'issueTrackerUser', 'issueTrackerPassword',
                      'understand', 'sloccount', 'windowSize', 'numWindows',
-                     'qualityType', 'communicationType', 'artifactType', 'dependencyType')
+                     'qualityType', 'communicationType', 'artifactType', 'dependencyType',
+                     'issueAnalyzerProjectName', 'issueAnalyzerType', 'issueAnalyzerURL',
+                     'issueAnalyzerProduct', 'issueAnalyzerBugOpenedDays', 'issueAnalyzerBugFixedDays',
+                     'issueAnalyzerPriority1', 'issueAnalyzerPriority2', 'issueAnalyzerSeverity1',
+                     'issueAnalyzerSeverity2', 'issueAnalyzerSeverity3', 'issueAnalyzerSeverity4',
+                     'issueAnalyzerSeverity5', 'issueAnalyzerSeverity6', 'issueAnalyzerSeverity7')
     ALL_KEYS = set(GLOBAL_KEYS + GLOBAL_OPTIONAL_KEYS + PROJECT_KEYS +
                    OPTIONAL_KEYS)
 
