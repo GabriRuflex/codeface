@@ -734,8 +734,8 @@ def getResult(issueAnalyzer, projectId):
             timeUnavailable = statRow[1]
             
             timeAssignments = developerTimeAssignments[developer] if developer in developerTimeAssignments.keys() else 0
-            developerBusy = (timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"]-(timeUnavailable+timeAssignments)) > 0
-            if not developerBusy == False:
+            developerBusy = (timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"]-(timeUnavailable+timeAssignments)) <= 0
+            if not developerBusy:
                 # avgNumAssigned/numAssigned
                 availability = float(utils.safeDiv(avgNumAssigned, numAssigned, avgNumAssigned+1))
 

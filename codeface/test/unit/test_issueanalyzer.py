@@ -359,8 +359,8 @@ class TestIssueAnalyzer(unittest.TestCase):
         issue_tables = self.dbm.get_data_stored(self.projectId)
 
         bugCheck = True
-        if len(issue_tables["bugs"]) > 0:
-            result = issue_tables["bugs"][0]
+        if len(issue_tables[utils.KEY_ITEMS_BUGS]) > 0:
+            result = issue_tables[utils.KEY_ITEMS_BUGS][0]
             
             issueId = result[0]
             projectId = result[1]
@@ -394,8 +394,8 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertTrue(bugCheck, bugMsg)
 
         developerCheck = True
-        if len(issue_tables["developers"]) > 0:
-            result = issue_tables["developers"][0]
+        if len(issue_tables[utils.KEY_ITEMS_DEVELOPERS]) > 0:
+            result = issue_tables[utils.KEY_ITEMS_DEVELOPERS][0]
             
             developerName = result[0]
             developerRealName = result[1]
@@ -411,8 +411,8 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertTrue(developerCheck, developerMsg)
 
         attachmentCheck = True
-        if len(issue_tables["attachments"]) > 0:
-            result = issue_tables["attachments"][0]
+        if len(issue_tables[utils.KEY_ITEMS_ATTACHMENTS]) > 0:
+            result = issue_tables[utils.KEY_ITEMS_ATTACHMENTS][0]
             
             attachmentId = result[0]
             projectId = result[1]
@@ -441,8 +441,8 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertTrue(attachmentCheck, attachmentMsg)      
 
         commentCheck = True
-        if len(issue_tables["comments"]) > 0:
-            result = issue_tables["comments"][0]
+        if len(issue_tables[utils.KEY_ITEMS_COMMENTS]) > 0:
+            result = issue_tables[utils.KEY_ITEMS_COMMENTS][0]
             
             commentId = result[0]
             projectId = result[1]
@@ -465,8 +465,8 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertTrue(commentCheck, commentMsg)
 
         historyCheck = True
-        if len(issue_tables["history"]) > 0:
-            result = issue_tables["history"][0]
+        if len(issue_tables[utils.KEY_ITEMS_HISTORY]) > 0:
+            result = issue_tables[utils.KEY_ITEMS_HISTORY][0]
             
             issueId = result[0]
             projectId = result[1]
@@ -493,9 +493,9 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertTrue(historyCheck, historyMsg)
         
         relationCheck = True
-        if len(issue_tables["relations"]) > 0:
-            resultBlocks = issue_tables["relations"][0]
-            resultDependsOn = issue_tables["relations"][1]
+        if len(issue_tables[utils.KEY_ITEMS_RELATIONS]) > 0:
+            resultBlocks = issue_tables[utils.KEY_ITEMS_RELATIONS][0]
+            resultDependsOn = issue_tables[utils.KEY_ITEMS_RELATIONS][1]
             
             issueIdBlocks = resultBlocks[0]
             projectIdBlocks = resultBlocks[1]

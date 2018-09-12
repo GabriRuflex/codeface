@@ -418,7 +418,7 @@ class DBManager:
         # Check if project already exists
         self.doExec("SELECT projectId FROM issue_project WHERE url=%s AND name=%s;", (url, name))
         if self.cur.rowcount > 0:
-            if recreateIfExist == False:
+            if not recreateIfExist:
                 # Just return the project ID
                 return self.doFetchAll()[0][0]
             else:
@@ -563,32 +563,32 @@ class DBManager:
         sqlQuery = "select issueId, projectId, summary, component, creationTime, creator, assignedTo, priority, severity, " \
                    "status, resolution, isOpen, votes, commentCount, keywords, lastResolved from issue_data where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["bugs"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_BUGS] = self.doFetchAll()
 
         sqlQuery = "select name, realName, projectId, developerId  " \
                    "from issue_developer where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["developers"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_DEVELOPERS] = self.doFetchAll()
 
         sqlQuery = "select attachmentId, projectId, issueId, creator, creationTime, isObsolete, isPatch, isPrivate, size, positiveReviews " \
                    "from issue_attachment where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["attachments"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_ATTACHMENTS] = self.doFetchAll()
 
         sqlQuery = "select commentId, projectId, issueId, author, time, rawText " \
                    "from issue_comment where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["comments"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_COMMENTS] = self.doFetchAll()
 
         sqlQuery = "select issueId, projectId, who, time, added, removed, attachmentId, fieldName " \
                    "from issue_history where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["history"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_HISTORY] = self.doFetchAll()
 
         sqlQuery = "select issueId, projectId, relatedIssueId, relationType " \
                    "from issue_dependencies where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
-        issue_tables["relations"] = self.doFetchAll()
+        issue_tables[utils.KEY_ITEMS_RELATIONS] = self.doFetchAll()
 
         return issue_tables
 
