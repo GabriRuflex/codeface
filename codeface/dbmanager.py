@@ -34,7 +34,7 @@ def _log_db_error(action, args=None):
     except mdb.Error as e:
         if args:
             try:
-                action = action % args
+                action = action.format(args)
             except:
                 pass
         log.critical('MySQL error {e[0]} during "{action}": {e[1]}'
@@ -440,8 +440,8 @@ class DBManager:
         try:
             self.doExecCommit("INSERT INTO issue_data "
                               "(issueId, projectId, summary, component, creationTime, creator, assignedTo, spentTime, priority, priorityValue, "
-                              "severity, severityValue, status, resolution, isOpen, votes, commentCount, keywords, lastResolved) "
-                              "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", issue_data)
+                              "severity, severityValue, status, resolution, isOpen, votes, commentCount, keywords, lastResolved, realAssignee) "
+                              "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", issue_data)
         except mdb.MySQLError as e:
             if hasattr(e, 'message'):
                 log.debug("Error when inseriting issue data. Message: {}".format(e.message))
@@ -592,7 +592,7 @@ class DBManager:
 
         return issue_tables
 
-    def get_view_assignment(self, projectId, queryType = 0):
+    def get_view_assignment(self, projectId, queryType):
         """
         Get the developers' assignment data related to the project.
         """
@@ -605,6 +605,18 @@ class DBManager:
                     "avg(numCommentPosted) as 'avgNumCommentPosted', avg(numAttachmentPosted) as 'avgNumAttachmentPosted', " \
                     "avg(positiveReviews), avg(sizeAttachmentPosted) from view_assignment where projectId = {} " \
                     "GROUP BY issueId, component, priority, severity".format(projectId)
+        self.doExec(sqlQuery)
+        if self.cur.rowcount == 0:
+            log.debug("Data from project {} not found!".format(projectId))
+        return (self.cur)
+
+    def get_view_real_check(self, projectId):
+        """
+        Get the developers' assignment real check data related to the project.
+        """
+        sqlQuery = ""
+        sqlQuery = "select count(*) " \
+                   "from view_real_check where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
         if self.cur.rowcount == 0:
             log.debug("Data from project {} not found!".format(projectId))

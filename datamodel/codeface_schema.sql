@@ -1320,6 +1320,7 @@ CREATE TABLE IF NOT EXISTS `codeface`.`issue_data` (
   `commentCount` INT NULL,
   `keywords` LONGTEXT NULL,
   `lastResolved` DATETIME NULL,
+  `realAssignee` VARCHAR(255) NULL,
   PRIMARY KEY (`issueId`, `projectId`),
   CONSTRAINT `issue_projectId_projectId`
     FOREIGN KEY (`projectId`)
@@ -1494,18 +1495,18 @@ CREATE TABLE IF NOT EXISTS `codeface`.`issue_assignment` (
   CONSTRAINT `fk_issue_assignment_1`
     FOREIGN KEY (`projectId`)
     REFERENCES `codeface`.`issue_project` (`projectId`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
   CONSTRAINT `fk_issue_assignment_2`
     FOREIGN KEY (`developerName` , `projectId`)
     REFERENCES `codeface`.`issue_developer` (`name` , `projectId`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION,
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
   CONSTRAINT `fk_issue_assignment_3`
     FOREIGN KEY (`issueId` , `projectId`)
     REFERENCES `codeface`.`issue_data` (`issueId` , `projectId`)
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE)
 ENGINE = InnoDB;
 
 CREATE INDEX `fk_issue_assignment_1_idx` ON `codeface`.`issue_assignment` (`projectId` ASC);

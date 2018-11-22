@@ -24,6 +24,19 @@ import datetime as dt
 import os
 from os.path import expanduser
 
+# Analyzer's run modes
+RUN_MODE_ANALYSIS = 0
+RUN_MODE_TEST = 1
+
+# Definitions for analysis
+DEFAULT_TIME_INCREMENT = 1.1
+
+DEFAULT_COEFF_AVAILABILITY = 0.2
+DEFAULT_COEFF_COLLABORATIVITY = 0.15
+DEFAULT_COEFF_COMPETENCY = 0.15
+DEFAULT_COEFF_PRODUCTIVITY = 0.3
+DEFAULT_COEFF_RELIABILITY = 0.2
+
 # Dict keys to handle scratching's results
 KEY_ITEMS_BUGS = "bugs"
 KEY_ITEMS_DEVELOPERS = "developers"
@@ -36,8 +49,12 @@ QUERY_TYPE_ALL_ASSIGNMENTS = 0
 QUERY_TYPE_ASSIGNMENTS_STATS = 1
 
 # Cache parameters to store scratching's results
+CACHE_INDEX_TYPE_ANALYSIS = 0
+CACHE_INDEX_TYPE_TEST = 1
+
 CACHE_DEFAULT_DIRECTORY = os.path.join(expanduser("~"), "Issue Analyzer Cache")
-CACHE_INDEX_FILE = "issueAnalyzerIndex"
+CACHE_ANALYSIS_INDEX_FILE = "issueAnalyzerAnalysisIndex"
+CACHE_TEST_INDEX_FILE = "issueAnalyzerTestIndex"
 
 def convertToDateTime(oldDate):
     """Convert a Bugzilla timestamp into a SQL compatible DateTime object
@@ -76,7 +93,24 @@ def encodeURIWithUTF8(uri):
     """
     return urllib.quote(encodeWithUTF8(uri))
 
-def safeDiv (op1, op2, defaultResult):
+def getUrlByRunMode(url, runMode):
+    """Get correct URL
+
+    Args:
+        url (string): The URL to use
+        runMode (numeric): Run mode currently in use
+
+    Returns (string): The numeric operation's result
+
+    """
+    result = url
+    # If runMode is TEST, just flip the URL
+    if runMode == RUN_MODE_TEST:
+        result = result[::-1]
+
+    return result
+
+def safeDiv(op1, op2, defaultResult):
     """Safetly divide
 
     Args:

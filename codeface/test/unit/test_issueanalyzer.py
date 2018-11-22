@@ -50,6 +50,7 @@ class TestIssueAnalyzer(unittest.TestCase):
 
         # Create temporary folder
         self.tmpDirectory = tempfile.mkdtemp()
+        self.fakeDir = os.path.join(self.tmpDirectory, "fake/path")
         
         # Create a test configuration file
         self.global_conf = NamedTemporaryFile(delete=False)
@@ -80,6 +81,13 @@ class TestIssueAnalyzer(unittest.TestCase):
 
             issueAnalyzerURL: bugzilla.url
             issueAnalyzerProduct: Bugzilla Project
+
+            issueAnalyzerTimeIncrement: 1.1
+            issueAnalyzerAvailability: 0.2
+            issueAnalyzerCollaborativity: 0.15
+            issueAnalyzerCompetency: 0.15
+            issueAnalyzerProductivity: 0.3
+            issueAnalyzerReliability: 0.2
 
             issueAnalyzerBugOpenedDays: 60
             issueAnalyzerBugFixedDays: 90
@@ -145,6 +153,20 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.idxComName = cache.get_path("/", self.urlResult[utils.KEY_ITEMS_COMMENTS])[1:]
         self.idxHisName = cache.get_path("/", self.urlResult[utils.KEY_ITEMS_HISTORY])[1:]
 
+        # Create an IssueAnalyzer's instance
+        self.issueAnalyzer = IssueAnalyzer("analysisOnly", self.global_conf.name, self.project_conf.name, self.fakeDir)
+
+        self.issueAnalyzer.urlResult = self.urlResult
+        self.issueAnalyzer.bugResult = self.bugResult
+        self.issueAnalyzer.devResult = self.devResult
+        self.issueAnalyzer.attachmentResult = self.attachmentResult
+        self.issueAnalyzer.commentResult = self.commentResult
+        self.issueAnalyzer.historyResult = self.historyResult
+        self.issueAnalyzer.relationResult = self.relationResult
+
+        self.issueAnalyzer.runMode = utils.RUN_MODE_ANALYSIS
+        self.issueAnalyzer.indexType = utils.CACHE_INDEX_TYPE_ANALYSIS
+
     @classmethod
     def tearDownClass(self):
         '''
@@ -176,6 +198,11 @@ class TestIssueAnalyzer(unittest.TestCase):
         utilsMsg = "Function codeface.issueanalyzer.common_utils.encodeURIWithUTF8() is broken"
         self.assertEqual(utils.encodeURIWithUTF8("https://bugzilla.mozilla.org/rest/bug?id=35"), "https%3A//bugzilla.mozilla.org/rest/bug%3Fid%3D35", utilsMsg)
 
+        # getUrlByRunMode()
+        utilsMsg = "Function codeface.issueanalyzer.common_utils.getUrlByRunMode() is broken"
+        self.assertEqual(utils.getUrlByRunMode("bugzilla.url/bugs", utils.RUN_MODE_ANALYSIS), "bugzilla.url/bugs", utilsMsg)
+        self.assertEqual(utils.getUrlByRunMode("bugzilla.url/bugs", utils.RUN_MODE_TEST), "sgub/lru.allizgub", utilsMsg)        
+
         # safeDiv()
         utilsMsg = "Function codeface.issueanalyzer.common_utils.safeDiv() is broken"
         self.assertEqual(utils.safeDiv(42,0,0), 0, utilsMsg)
@@ -205,26 +232,30 @@ class TestIssueAnalyzer(unittest.TestCase):
         '''
         Tests issue analyzer's cache library
         '''
-        fakeDir = os.path.join(self.tmpDirectory, "fake/path")
-        calculatedIdxBug = os.path.join(fakeDir, self.idxBugName)
-        calculatedIdxDev = os.path.join(fakeDir, self.idxDevName)
-        calculatedIdxRel = os.path.join(fakeDir, self.idxRelName)
-        calculatedIdxAtc = os.path.join(fakeDir, self.idxAtcName)
-        calculatedIdxCom = os.path.join(fakeDir, self.idxComName)
-        calculatedIdxHis = os.path.join(fakeDir, self.idxHisName)
+        calculatedIdxBug = os.path.join(self.fakeDir, self.idxBugName)
+        calculatedIdxDev = os.path.join(self.fakeDir, self.idxDevName)
+        calculatedIdxRel = os.path.join(self.fakeDir, self.idxRelName)
+        calculatedIdxAtc = os.path.join(self.fakeDir, self.idxAtcName)
+        calculatedIdxCom = os.path.join(self.fakeDir, self.idxComName)
+        calculatedIdxHis = os.path.join(self.fakeDir, self.idxHisName)
 
         # get_path()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.get_path() is broken"
-        self.assertEqual(cache.get_path(fakeDir, self.urlResult[utils.KEY_ITEMS_BUGS]), calculatedIdxBug, cacheMsg)
+        self.assertEqual(cache.get_path(self.fakeDir, self.urlResult[utils.KEY_ITEMS_BUGS]), calculatedIdxBug, cacheMsg)
 
         # get_index_path()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.get_index_path() is broken"
-        self.assertEqual(cache.get_index_path(fakeDir, False), "", cacheMsg)
-        self.assertEqual(cache.get_index_path(fakeDir, True), os.path.join(fakeDir, utils.CACHE_INDEX_FILE), cacheMsg)
+        self.assertEqual(cache.get_index_path(self.issueAnalyzer, False), "", cacheMsg)
+        self.assertEqual(cache.get_index_path(self.issueAnalyzer, True), os.path.join(self.fakeDir, utils.CACHE_ANALYSIS_INDEX_FILE), cacheMsg)
+
+        self.issueAnalyzer.indexType = utils.CACHE_INDEX_TYPE_TEST
+        self.assertEqual(cache.get_index_path(self.issueAnalyzer, False), "", cacheMsg)
+        self.assertEqual(cache.get_index_path(self.issueAnalyzer, True), os.path.join(self.fakeDir, utils.CACHE_TEST_INDEX_FILE), cacheMsg)
+        self.issueAnalyzer.indexType = utils.CACHE_INDEX_TYPE_ANALYSIS
 
         # put_data()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.put_data() is broken"
-        fakePath = cache.put_data(fakeDir, self.urlResult[utils.KEY_ITEMS_BUGS], self.bugResult)
+        fakePath = cache.put_data(self.fakeDir, self.urlResult[utils.KEY_ITEMS_BUGS], self.bugResult)
         self.assertEqual(fakePath, calculatedIdxBug, cacheMsg)
 
         # get_data()
@@ -234,9 +265,9 @@ class TestIssueAnalyzer(unittest.TestCase):
         # create_index() and parse_index()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.create_index() or parse_index() is broken"
         
-        fakePath = cache.create_index(fakeDir, calculatedIdxBug, calculatedIdxDev, calculatedIdxAtc, calculatedIdxCom, calculatedIdxHis, calculatedIdxRel)
-        [idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel] = cache.parse_index(os.path.dirname(fakePath))        
-        
+        fakePath = cache.create_index(self.issueAnalyzer, calculatedIdxBug, calculatedIdxDev, calculatedIdxAtc, calculatedIdxCom, calculatedIdxHis, calculatedIdxRel)
+        [idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel] = cache.parse_index(self.issueAnalyzer)        
+
         self.assertEqual(calculatedIdxBug, idxBug, cacheMsg)
         self.assertEqual(calculatedIdxDev, idxDev, cacheMsg)
         self.assertEqual(calculatedIdxAtc, idxAtc, cacheMsg)
@@ -252,17 +283,17 @@ class TestIssueAnalyzer(unittest.TestCase):
 
         # indexPathExists()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.indexPathExists() is broken"
-        self.assertTrue(cache.indexPathExists(fakeDir), cacheMsg)
+        self.assertTrue(cache.indexPathExists(self.issueAnalyzer), cacheMsg)
 
         # delete_data()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.delete_data() is broken"
-        self.assertTrue(os.path.exists(fakeDir), cacheMsg)
-        cache.delete_data(fakeDir)
-        self.assertFalse(os.path.exists(fakeDir), cacheMsg)
+        self.assertTrue(os.path.exists(self.fakeDir), cacheMsg)
+        cache.delete_data(self.issueAnalyzer)
+        self.assertFalse(os.path.exists(self.fakeDir), cacheMsg)
 
         # indexPathExists()
         cacheMsg = "Function codeface.issueanalyzer.issue_cache.indexPathExists() is broken"
-        self.assertFalse(cache.indexPathExists(fakeDir), cacheMsg)
+        self.assertFalse(cache.indexPathExists(self.issueAnalyzer), cacheMsg)
 
     def test_configurationParameters(self):
         '''
@@ -288,6 +319,12 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertEqual(self.conf["issueAnalyzerType"], "bugzilla")
         self.assertEqual(self.conf["issueAnalyzerURL"], "bugzilla.url")
         self.assertEqual(self.conf["issueAnalyzerProduct"], "Bugzilla Project")
+        self.assertEqual(self.conf["issueAnalyzerTimeIncrement"], 1.1)
+        self.assertEqual(self.conf["issueAnalyzerAvailability"], 0.2)
+        self.assertEqual(self.conf["issueAnalyzerCollaborativity"], 0.15)
+        self.assertEqual(self.conf["issueAnalyzerCompetency"], 0.15)
+        self.assertEqual(self.conf["issueAnalyzerProductivity"], 0.3)
+        self.assertEqual(self.conf["issueAnalyzerReliability"], 0.2)
         self.assertEqual(self.conf["issueAnalyzerBugOpenedDays"], 60)
         self.assertEqual(self.conf["issueAnalyzerBugFixedDays"], 90)
         self.assertEqual(self.conf["issueAnalyzerPriority1"], "P1")
@@ -303,59 +340,37 @@ class TestIssueAnalyzer(unittest.TestCase):
     def test_storeAndGetOnCache(self):
         '''
         Tests that store on cache and get from it work properly
-        '''
-        # Create an IssueAnalyzer's instance
-        issueAnalyzer = IssueAnalyzer(self.global_conf.name, self.project_conf.name, self.tmpDirectory)
-
-        issueAnalyzer.urlResult = self.urlResult
-        issueAnalyzer.bugResult = self.bugResult
-        issueAnalyzer.devResult = self.devResult
-        issueAnalyzer.attachmentResult = self.attachmentResult
-        issueAnalyzer.commentResult = self.commentResult
-        issueAnalyzer.historyResult = self.historyResult
-        issueAnalyzer.relationResult = self.relationResult
-        
+        '''        
         # Store on cache
-        cache.storeOnCache(issueAnalyzer)
+        cache.storeOnCache(self.issueAnalyzer)
 
         # Get from cache
-        cache.getFromCache(issueAnalyzer)
+        cache.getFromCache(self.issueAnalyzer)
 
         # Compare the results
         bugMsg = "Cache storage of bugs is broken"
-        self.assertEqual(self.bugResult, issueAnalyzer.bugResult, bugMsg)
+        self.assertEqual(self.bugResult, self.issueAnalyzer.bugResult, bugMsg)
 
         developerMsg = "Cache storage of developers is broken"
-        self.assertEqual(self.devResult, issueAnalyzer.devResult, developerMsg)
+        self.assertEqual(self.devResult, self.issueAnalyzer.devResult, developerMsg)
 
         attachmentMsg = "Cache storage of attachments is broken"
-        self.assertEqual(self.attachmentResult, issueAnalyzer.attachmentResult, attachmentMsg)
+        self.assertEqual(self.attachmentResult, self.issueAnalyzer.attachmentResult, attachmentMsg)
 
         commentMsg = "Cache storage of comments is broken"
-        self.assertEqual(self.commentResult, issueAnalyzer.commentResult, commentMsg)
+        self.assertEqual(self.commentResult, self.issueAnalyzer.commentResult, commentMsg)
 
         historyMsg = "Cache storage of history is broken"
-        self.assertEqual(self.historyResult, issueAnalyzer.historyResult, historyMsg)
+        self.assertEqual(self.historyResult, self.issueAnalyzer.historyResult, historyMsg)
 
         relationMsg = "Cache storage of relations is broken"
-        self.assertEqual(self.relationResult, issueAnalyzer.relationResult, relationMsg)
+        self.assertEqual(self.relationResult, self.issueAnalyzer.relationResult, relationMsg)
 
     def test_storeAndGetOnDatabase(self):
         '''
         Tests that store on database and get from it work properly
         '''
-        # Create an IssueAnalyzer's instance
-        issueAnalyzer = IssueAnalyzer(self.global_conf.name, self.project_conf.name, self.tmpDirectory)
-
-        issueAnalyzer.urlResult = self.urlResult
-        issueAnalyzer.bugResult = self.bugResult
-        issueAnalyzer.devResult = self.devResult
-        issueAnalyzer.attachmentResult = self.attachmentResult
-        issueAnalyzer.commentResult = self.commentResult
-        issueAnalyzer.historyResult = self.historyResult
-        issueAnalyzer.relationResult = self.relationResult        
-        
-        self.projectId = bugzilla.analyze(issueAnalyzer)
+        self.projectId = bugzilla.analyze(self.issueAnalyzer)
         issue_tables = self.dbm.get_data_stored(self.projectId)
 
         bugCheck = True

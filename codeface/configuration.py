@@ -48,6 +48,8 @@ class Configuration(Mapping):
                      'understand', 'sloccount', 'windowSize', 'numWindows',
                      'qualityType', 'communicationType', 'artifactType', 'dependencyType',
                      'issueAnalyzerProjectName', 'issueAnalyzerType', 'issueAnalyzerURL',
+                     'issueAnalyzerTimeIncrement', 'issueAnalyzerAvailability', 'issueAnalyzerCollaborativity',
+                     'issueAnalyzerCompetency', 'issueAnalyzerProductivity', 'issueAnalyzerReliability',
                      'issueAnalyzerProduct', 'issueAnalyzerBugOpenedDays', 'issueAnalyzerBugFixedDays',
                      'issueAnalyzerPriority1', 'issueAnalyzerPriority2', 'issueAnalyzerSeverity1',
                      'issueAnalyzerSeverity2', 'issueAnalyzerSeverity3', 'issueAnalyzerSeverity4',

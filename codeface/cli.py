@@ -46,11 +46,15 @@ def get_parser():
     sub_parser = parser.add_subparsers(help='select action')
     ia_parser = sub_parser.add_parser('ia', help='Run "Issue Analyzer"')
     ia_parser.set_defaults(func=cmd_ia)
+    ia_parser.add_argument('-m', '--runMode',
+                           choices=['all', 'analysisOnly', 'testOnly'], default='all',
+                           help='Choose the run mode',)
     ia_parser.add_argument('-c', '--config', required=True,
                            help="Codeface configuration file", default='codeface.conf')
     ia_parser.add_argument('-p', '--project', required=True,
                            help='Project configuration file')
-    ia_parser.add_argument('-dir', '--directory', help='Cache directory')
+    ia_parser.add_argument('-dir', '--directory',
+                           help='Cache directory')
     ia_parser.add_argument('-ddb', '--dropDatabase', action='store_true',
                            help='Drop database', default=False)
     ia_parser.add_argument('-ao', '--analyzeOnly', action='store_true',
@@ -59,7 +63,20 @@ def get_parser():
                            help='Scratch only, without analyzing', default=False)
     ia_parser.add_argument('-dco', '--deleteCacheOnly', action='store_true',
                            help='Delete cache only', default=False)
-    ia_parser.add_argument('-l', '--logpath', help='Log path')
+    ia_parser.add_argument('-l', '--logpath',
+                           help='Log path')
+    ia_parser.add_argument('-cTin', '--coefficientTimeIncrement',
+                           help='Coefficient of time increment quality parameter', default=None)
+    ia_parser.add_argument('-cAva', '--coefficientAvailability',
+                           help='Coefficient of availability quality parameter', default=None)
+    ia_parser.add_argument('-cCol', '--coefficientCollaborativity',
+                           help='Coefficient of collaborativity quality parameter', default=None)
+    ia_parser.add_argument('-cCom', '--coefficientCompetency',
+                           help='Coefficient of competency quality parameter', default=None)
+    ia_parser.add_argument('-cPro', '--coefficientProductivity',
+                           help='Coefficient of productivity quality parameter', default=None)
+    ia_parser.add_argument('-cRel', '--coefficientReliability',
+                           help='Coefficient of reliability quality parameter', default=None)
 
     test_parser = sub_parser.add_parser('test', help='Run tests')
     test_parser.set_defaults(func=cmd_test)
@@ -213,8 +230,12 @@ def cmd_ia(args):
     # Get user preferences
     flags = [args.dropDatabase, args.scratchOnly, args.analyzeOnly, args.deleteCacheOnly]
 
+    # Set quality parameters
+    qParams = [args.coefficientTimeIncrement, args.coefficientAvailability, args.coefficientCollaborativity, \
+               args.coefficientCompetency, args.coefficientProductivity, args.coefficientReliability]
+
     # Call the issue analyzer handler
-    issueAnalyzer = IssueAnalyzer(codefaceConfig, iaProject, cacheDirectory, flags, logPath, args.jobs)
+    issueAnalyzer = IssueAnalyzer(args.runMode, codefaceConfig, iaProject, cacheDirectory, flags, qParams, logPath, args.jobs)
     issueAnalyzer.handle()
 
 def cmd_test(args):

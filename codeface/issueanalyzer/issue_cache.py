@@ -42,18 +42,19 @@ def get_path(directory, url):
     
     return os.path.join(os.path.abspath(directory), h[:4], h[4:8], h[8:])
 
-def get_index_path(directory, createDirectory = False):
+def get_index_path(issueAnalyzer, createDirectory):
     """Get the index file's path
 
     Args:
-        directory (str): Index file directory path
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
         createDirectory (bool): If true and directory doesn't exist, create it
 
     Returns (string): Absolute index file path
 
     """
     # Get the index path
-    path = os.path.join(directory, utils.CACHE_INDEX_FILE)
+    indexFile = utils.CACHE_ANALYSIS_INDEX_FILE if issueAnalyzer.indexType == utils.CACHE_INDEX_TYPE_ANALYSIS else utils.CACHE_TEST_INDEX_FILE
+    path = os.path.join(issueAnalyzer.cacheDirectory, indexFile)
 
     # If index file doesn't exist, return empty path
     if not os.path.isfile(path):
@@ -110,11 +111,11 @@ def put_data(directory, url, data):
 
     return path
 
-def create_index(directory, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel):
+def create_index(issueAnalyzer, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel):
     """Create main index file
 
     Args:
-        directory (str): Cache directory path
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
         idxBug (dict): Bug dict index path
         idxDev (dict): Developer dict index path
         idxAtc (dict): Attachment dict index path
@@ -126,7 +127,7 @@ def create_index(directory, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel):
 
     """
     # Get data path
-    path = get_index_path(directory, True)
+    path = get_index_path(issueAnalyzer, True)
 
     # Write data on file
     with open(path,'w+') as file:
@@ -139,16 +140,16 @@ def create_index(directory, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel):
 
     return path
 
-def parse_index(directory):
+def parse_index(issueAnalyzer):
     """Get single indexes from main index file
     Args:
-        directory (str): Cache directory path
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
 
     Returns (tuple): Index files' path
 
     """
     # Get data path
-    path = get_index_path(directory)
+    path = get_index_path(issueAnalyzer, False)
 
     # Check if index exists
     if path == "":
@@ -161,20 +162,22 @@ def parse_index(directory):
 
     return lines
 
-def delete_data(directory):
+def delete_data(issueAnalyzer):
     """Delete all data on a directory
 
     Args:
-        directory (str): Cache directory path
+       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
 
     Returns None
 
     """
+    directory = issueAnalyzer.cacheDirectory
+    
     # Get files' path on cache
-    paths = parse_index(directory)
+    paths = parse_index(issueAnalyzer)
 
     # Check if index exists
-    index = get_index_path(directory)
+    index = get_index_path(issueAnalyzer, False)
     if index == "":
         return
     else:
@@ -214,18 +217,16 @@ def delete_file(path):
     except:
         pass
 
-def indexPathExists(cacheDirectory):
+def indexPathExists(issueAnalyzer):
     """Check if index path exists
 
     Args:
-        cacheDirectory (str): Directory path
+       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
 
     Returns bool: If true, it exists
 
-    """
-    result = (get_index_path(cacheDirectory) != "")
-    
-    return result
+    """    
+    return get_index_path(issueAnalyzer, False) != ""
 
 def storeOnCache(issueAnalyzer):
     """Store data on cache
@@ -247,7 +248,7 @@ def storeOnCache(issueAnalyzer):
     cacheDirectory = issueAnalyzer.cacheDirectory
     
     # Delete cache
-    delete_data(cacheDirectory)
+    delete_data(issueAnalyzer)
 
     # Store the result on the cache directory
     idxBug = put_data(cacheDirectory, urlResult[utils.KEY_ITEMS_BUGS], bugResult)
@@ -258,7 +259,7 @@ def storeOnCache(issueAnalyzer):
     idxRel = put_data(cacheDirectory, urlResult[utils.KEY_ITEMS_RELATIONS], relationResult)
 
     # Create the index file
-    create_index(cacheDirectory, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel)
+    create_index(issueAnalyzer, idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel)
 
 def getFromCache(issueAnalyzer):
     """Get data from cache
@@ -268,11 +269,9 @@ def getFromCache(issueAnalyzer):
 
     Returns None
 
-    """
-    cacheDirectory = issueAnalyzer.cacheDirectory
-    
+    """    
     # Read issues index from the given directory
-    [idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel] = parse_index(cacheDirectory)
+    [idxBug, idxDev, idxAtc, idxCom, idxHis, idxRel] = parse_index(issueAnalyzer)
 
     # Read issues from the given directory
     bugResult = get_data(idxBug)

@@ -15,9 +15,10 @@
 # All Rights Reserved.
 
 """
-Bugzilla issue analyzer module
+Bugzilla IssueAnalyzer module
 """
 
+import random
 import requests
 from datetime import datetime, timedelta
 from logging import getLogger; log = getLogger(__name__)
@@ -34,18 +35,19 @@ MORE_DEVELOPERS = 0
 # Definitions of query parameters
 QUERY_BUG_OPEN_NOT_ASSIGNED = 0
 QUERY_BUG_CLOSED_FIXED = 1
-QUERY_BUG_ASSIGNED = 2
-QUERY_ATTACHMENT_FROM_ID = 3
-QUERY_ATTACHMENT_OF_BUGLIST = 4
-QUERY_BUG_FROM_ID = 5
-QUERY_DEVELOPER_FROM_EMAIL = 6
-QUERY_DEVELOPER_FROM_EMAIL_LIST = 7
-QUERY_COMMENT_OF_BUG = 8
-QUERY_COMMENT_OF_BUGLIST = 9
-QUERY_HISTORY_OF_BUG = 10
-QUERY_HISTORY_OF_BUGLIST = 11
-QUERY_BUG_FROM_LIST = 12
-QUERY_BUG_FROM_ID_OR_LIST = 13
+QUERY_BUG_CLOSED_FIXED_PREVIOUS = 2
+QUERY_BUG_ASSIGNED = 3
+QUERY_ATTACHMENT_FROM_ID = 4
+QUERY_ATTACHMENT_OF_BUGLIST = 5
+QUERY_BUG_FROM_ID = 6
+QUERY_DEVELOPER_FROM_EMAIL = 7
+QUERY_DEVELOPER_FROM_EMAIL_LIST = 8
+QUERY_COMMENT_OF_BUG = 9
+QUERY_COMMENT_OF_BUGLIST = 10
+QUERY_HISTORY_OF_BUG = 11
+QUERY_HISTORY_OF_BUGLIST = 12
+QUERY_BUG_FROM_LIST = 13
+QUERY_BUG_FROM_ID_OR_LIST = 14
 
 # SQL results
 BUG_ID = 0
@@ -108,20 +110,28 @@ def getQueryParams(conf, queryType, idParam = [], bugStatus = []):
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugOpenedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
                      "&bug_status=NEW&bug_status=ASSIGNED&is_private=&chfield=[Bug creation]&chfieldfrom={}&chfieldto=Now" \
-                     "&email1=nobody%40mozilla.org&emailassigned_to1=1&emailtype1=exact&priority={}&priority={}&product={}&resolution=---").format(
+                     "&v1=nobody%40mozilla.org&f1=assigned_to&o1=exact&priority={}&priority={}&product={}&resolution=---").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_BUG_CLOSED_FIXED:
         # Get bugs fixed and resolved in the last [x] days (used to get a list of active developers)
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
-                     "&chfield=resolution&chfieldfrom={}&chfieldto=Now&chfieldvalue=FIXED&email1=nobody%40mozilla.org&emailassigned_to1=1&emailtype1=notequals" \
+                     "&chfield=resolution&chfieldfrom={}&chfieldto=Now&chfieldvalue=FIXED&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
                      "&priority={}&priority={}&product={}&resolution=FIXED").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
+    elif queryType == QUERY_BUG_CLOSED_FIXED_PREVIOUS:
+        # Get bugs fixed and resolved in the not last [x] days (used to get a list of bugs and developer for simulation)
+        dateFrom = (datetime.today() - timedelta(days=2*conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
+        dateTo = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
+        params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
+                     "&chfield=resolution&chfieldfrom={}&chfieldto={}&chfieldvalue=FIXED&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
+                     "&priority={}&priority={}&product={}&resolution=FIXED").format(
+                         conf['issueAnalyzerURL'], dateFrom, dateTo, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_BUG_ASSIGNED:
         # Get bugs assigned in the last [x] days (used to get a list of active developers)
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
-                     "&chfield=assigned_to&chfieldfrom={}&chfieldto=Now&email1=nobody%40mozilla.org&emailassigned_to1=1&emailtype1=notequals" \
+                     "&chfield=assigned_to&chfieldfrom={}&chfieldto=Now&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
                      "&priority={}&priority={}&product={}&resolution=---").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_ATTACHMENT_FROM_ID:
@@ -194,12 +204,12 @@ def scratch(issueAnalyzer):
     and then update the given dicts.
 
     Args:
-       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to update
+       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to update
 
     Returns None
 
     """
-    log.info("Issue analyzer is scratching via Bugzilla module.")
+    log.info("IssueAnalyzer is scratching via Bugzilla module.")
     restResult = dict()
 
     urlResult = dict()
@@ -210,19 +220,52 @@ def scratch(issueAnalyzer):
     historyResult = dict()
     relationResult = dict()
 
+    tempResult = []
+
     conf = issueAnalyzer.conf
+    runMode = issueAnalyzer.runMode
+
+    # Get and append all assigned fixed bugs
+    previousPeriod = runMode == utils.RUN_MODE_TEST
+    result = scratchBugClosedFixed(conf, previousPeriod)
+    if result.ok:
+        restResult = result.json()
+
+        log.info(str("Bug assigned and fixed. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
+    else:
+        log.info("Bug assigned and fixed: connection error.")
+
+    # Store the developers url
+    urlResult[utils.KEY_ITEMS_DEVELOPERS] = utils.getUrlByRunMode(result.url, runMode)
+
+    c = 0
+    if not runMode == utils.RUN_MODE_ANALYSIS:
+        # Get a subset of fixed bug an mark them as open and unassigned
+        numBugs = len(restResult["bugs"])
+        for i in range(0, numBugs/3):
+            bug = restResult["bugs"][random.randint(0, numBugs-1)]
+            if bug["assigned_to_detail"]["name"] == "nobody@mozilla.org":
+                tempResult.append(str("{} e {}").format(bug["id"],bug["realassignee"]))
+
+            # Save the real assignee
+            bug["realassignee"] = bug["assigned_to_detail"]["name"]
+
+            # Unassign the bug and make it open
+            bug["assigned_to"] = "nobody@mozilla.org"
+            bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
+                                         "real_name" : "Nobody; OK to take it and work on it"}
+            bug["is_open"] = True
+
+        log.critical(",".join(tempResult))
 
     # Get all open bugs not assigned
     result = scratchBugOpenNotAssigned(conf)
     if result.ok:
-        restResult = result.json()
+        restResult["bugs"] = restResult["bugs"] + result.json()["bugs"]
 
         log.info(str("Bug not assigned and open. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
     else:
         log.info("Bug not assigned and open: connection error.")
-
-    # Store the bugs url
-    urlResult[utils.KEY_ITEMS_BUGS] = result.url
     
     # Get and append all assigned open bugs
     result = scratchBugAssigned(conf)
@@ -233,17 +276,8 @@ def scratch(issueAnalyzer):
     else:
         log.info("Bug assigned and open: connection error.")
 
-    # Get and append all assigned fixed bugs
-    result = scratchBugClosedFixed(conf)
-    if result.ok:
-        restResult["bugs"] = restResult["bugs"] + result.json()["bugs"]
-
-        log.info(str("Bug assigned and fixed. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
-    else:
-        log.info("Bug assigned and fixed: connection error.")
-
-    # Store the developers url
-    urlResult[utils.KEY_ITEMS_DEVELOPERS] = result.url
+    # Store the bugs url
+    urlResult[utils.KEY_ITEMS_BUGS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Parse the bug results extracting the developers informations
     deps = set()
@@ -282,9 +316,12 @@ def scratch(issueAnalyzer):
                     c = c + 1
                     del bugResult[idBlocked]
 
-        log.info(str("Dependencies. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(num,num-c,c,len(result.content)))
+        log.info(str("Dependencies. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(num,c,num-c,len(result.content)))
     else:
         log.info("Dependencies: connection error.")
+
+    # Show total bug number
+    log.info(str("Total number of analysed bug: {}").format(len(bugResult.keys())))
 
     # Get dependencies and blocks relations
     for bug in bugResult:
@@ -294,12 +331,12 @@ def scratch(issueAnalyzer):
         relationResult[bug] = rel
 
     # Store the relations url
-    urlResult[utils.KEY_ITEMS_RELATIONS] = result.url
+    urlResult[utils.KEY_ITEMS_RELATIONS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Get attachments of bugs
     c = 0
     missedCreator = set()
-    result = scratchBugListAttachments(conf, bugResult.keys()[:100])
+    result = scratchBugListAttachments(conf, bugResult.keys()[:200])
     if result.ok:
         restResult = result.json()
         num = len(restResult["bugs"])
@@ -335,7 +372,7 @@ def scratch(issueAnalyzer):
         log.info(str("Attachments: connection error. {}").format(r.query))
 
     # Store the attachments url
-    urlResult[utils.KEY_ITEMS_ATTACHMENTS] = result.url
+    urlResult[utils.KEY_ITEMS_ATTACHMENTS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Get comments of bugs
     c = 0
@@ -354,7 +391,7 @@ def scratch(issueAnalyzer):
         log.info("Comments: connection error.")
 
     # Store the comments url
-    urlResult[utils.KEY_ITEMS_COMMENTS] = result.url
+    urlResult[utils.KEY_ITEMS_COMMENTS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Get history of bugs
     result = scratchBugListHistory(conf, bugResult.keys()[:200])
@@ -371,7 +408,7 @@ def scratch(issueAnalyzer):
         log.info("History: connection error.")
 
     # Store the history url
-    urlResult[utils.KEY_ITEMS_HISTORY] = result.url
+    urlResult[utils.KEY_ITEMS_HISTORY] = utils.getUrlByRunMode(result.url, runMode)
 
     issueAnalyzer.urlResult = urlResult
     issueAnalyzer.bugResult = bugResult
@@ -390,12 +427,13 @@ def analyze(issueAnalyzer):
     analyze them and then store the result on database.
 
     Args:
-       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
+       issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
 
     Returns None: The result is stored on database
 
     """
-    log.info("Issue analyzer is analyzing stored issues on cache.")
+    analysisMode = "analysis" if issueAnalyzer.runMode == utils.RUN_MODE_ANALYSIS else "test"
+    log.info(str("IssueAnalyzer is analyzing stored issues on cache in {} mode.").format(analysisMode))
 
     bugResult = issueAnalyzer.bugResult
     devResult = issueAnalyzer.devResult
@@ -463,6 +501,10 @@ def analyze(issueAnalyzer):
             spentTime = datetime.now() - utils.convertToDateTime(bugResult[bug]["creation_time"])
             spentTime = spentTime.days * 24 * 60 + spentTime.seconds / 60 # Time in minutes
 
+        realAssignee = "NULL"
+        if "realassignee" in bugResult[bug].keys():
+            realAssignee = bugResult[bug]["realassignee"]
+
         issue_data.append((bug,
                            projectId,
                            utils.encodeWithUTF8(bugResult[bug]["summary"]),
@@ -481,7 +523,8 @@ def analyze(issueAnalyzer):
                            bugResult[bug]["votes"],
                            bugResult[bug]["comment_count"],
                            utils.encodeWithUTF8(",".join(bugResult[bug]["keywords"])),
-                           utils.convertToDateTime(bugResult[bug]["cf_last_resolved"])))        
+                           utils.convertToDateTime(bugResult[bug]["cf_last_resolved"]),
+                           realAssignee))
 
         for cc in bugResult[bug]["cc"]:
             # Parse the CC list
@@ -593,7 +636,7 @@ def getResult(issueAnalyzer, projectId):
     developer-issue assignments and store the result on database.
 
     Args:
-        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): Issue Analyzer instance to handle
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
         projectId (int): The id of the current project
 
     Returns None: The result is stored on database
@@ -601,6 +644,13 @@ def getResult(issueAnalyzer, projectId):
     """
     conf = issueAnalyzer.conf
     dbm = DBManager(conf)
+
+    timeIncrement = conf["issueAnalyzerTimeIncrement"]
+    coeffAvailability = conf["issueAnalyzerAvailability"]
+    coeffCollaborativity = conf["issueAnalyzerCollaborativity"]
+    coeffCompetency = conf["issueAnalyzerCompetency"]
+    coeffProductivity = conf["issueAnalyzerProductivity"]
+    coeffReliability = conf["issueAnalyzerReliability"]
 
     # Get all the bug statistics
     bugStatistics = dict()
@@ -734,7 +784,8 @@ def getResult(issueAnalyzer, projectId):
             timeUnavailable = statRow[1]
             
             timeAssignments = developerTimeAssignments[developer] if developer in developerTimeAssignments.keys() else 0
-            developerBusy = (timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"]-(timeUnavailable+timeAssignments)) <= 0
+            #log.info(str("DEV: {} TIME ASSIGNMENTS: {}").format(developer, timeAssignments))
+            developerBusy = timeIncrement*float(timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"])-float(timeUnavailable+timeAssignments) <= 0
             if not developerBusy:
                 # avgNumAssigned/numAssigned
                 availability = float(utils.safeDiv(avgNumAssigned, numAssigned, avgNumAssigned+1))
@@ -747,14 +798,21 @@ def getResult(issueAnalyzer, projectId):
                 competency = float(utils.safeDiv(numAssigned, avgNumAssigned, numAssigned) + \
                                     utils.safeDiv(reviews, avgReviews, reviews))
 
-                # avgDevAvgTime/devAvgTime + avgReviews/reviews*numAttachment/avgNumAttachment + sizeAttachment/avgSizeAttachment*devAvgTime/avgDevAvgTime
-                reliability = float(utils.safeDiv(avgDevAvgTime, devAvgTime, avgDevAvgTime+1) + \
-                                    utils.safeDiv(avgReviews, reviews, 0)*utils.safeDiv(numAttachment, avgNumAttachment, numAttachment) + \
-                                    utils.safeDiv(sizeAttachment, avgSizeAttachment, sizeAttachment)/utils.safeDiv(devAvgTime, avgDevAvgTime, devAvgTime))                
+                # (avgReviews/reviews*(sizeAttachment/avgSizeAttachment * avgNumAttachment/numAttachment) + numComment/avgNumComment) * avgDevAvgTime/devAvgTime
+                productivity = float((utils.safeDiv(reviews, avgReviews, 0) * \
+                                     (utils.safeDiv(sizeAttachment, avgSizeAttachment, sizeAttachment) * \
+                                      utils.safeDiv(numAttachment, avgNumAttachment, numAttachment)) + \
+                                      utils.safeDiv(numComment, avgNumComment, numComment)) * \
+                                     utils.safeDiv(avgDevAvgTime, devAvgTime, avgDevAvgTime + 1))
+
+                # numAssigned/avgNumAssigned * avgDevAvgTime/devAvgTime
+                reliability = float(utils.safeDiv(numAssigned, avgNumAssigned, numAssigned) * \
+                                    utils.safeDiv(avgDevAvgTime, devAvgTime, avgDevAvgTime + 1))               
 
                 # Calculate the total rank
-                rank = availability*0.2 + collaborativity*0.15 + competency*0.35 + reliability*0.2
-                
+                rank = availability*coeffAvailability + collaborativity*coeffCollaborativity + competency*coeffCompetency + \
+                       productivity*coeffProductivity + reliability*coeffReliability
+
                 # If the rank is the best for this bug, assign it to the developer
                 if rank > assigneeRank:
                     assignee = developer
@@ -776,6 +834,13 @@ def getResult(issueAnalyzer, projectId):
     dbm.add_issue_assignment(issue_assignment)
     log.info(str("Bug assigned: {} of {}. Possible assignments: {}.").format(len(assignmentResults), len(bugStatistics), nAssignmentResult))
 
+    # Check the degree of compliance
+    if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
+        realCheckResult = dbm.get_view_real_check(projectId)
+        (numRealCheckResults,)= realCheckResult.fetchone()
+
+        log.info(str("Real check assignments value: {}%.").format(numRealCheckResults/len(assignmentResults)*100))
+
     log.info("Analysis is terminated.")
 
 def scratchBugOpenNotAssigned(conf):
@@ -787,12 +852,18 @@ def scratchBugOpenNotAssigned(conf):
 
     return r
 
-def scratchBugClosedFixed(conf):
-    query = getQueryParams(conf, QUERY_BUG_CLOSED_FIXED)
+def scratchBugClosedFixed(conf, previousPeriod):
+    queryType = QUERY_BUG_CLOSED_FIXED
+    if previousPeriod:
+        queryType = QUERY_BUG_CLOSED_FIXED_PREVIOUS
+    query = getQueryParams(conf, queryType)
     
     r = requests.get(query)
     if SHOW_DEBUG:
-        log.info(str("QUERY_BUG_CLOSED_FIXED: {}".format(query)))
+        if not previousPeriod:
+            log.info(str("QUERY_BUG_CLOSED_FIXED: {}".format(query)))
+        else:
+            log.info(str("QUERY_BUG_CLOSED_FIXED_PREVIOUS: {}".format(query)))
 
     return r
 
