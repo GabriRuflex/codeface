@@ -1256,7 +1256,6 @@ SELECT
         prm.rankValue AS rankValue
 FROM pagerank_matrix prm JOIN person p ON p.id=prm.personId;
 
-
 -- -----------------------------------------------------
 -- Table `codeface`.`issue_project`
 -- -----------------------------------------------------
@@ -1541,6 +1540,16 @@ CREATE TABLE IF NOT EXISTS `codeface`.`view_issue` (`'developerName'` INT, `proj
 CREATE TABLE IF NOT EXISTS `codeface`.`view_developer` (`developerName` INT, `projectId` INT, `component` INT, `priority` INT, `isOpen` INT, `'issueAssigned'` INT, `'avgTime'` INT, `'numCommentPosted'` INT, `'numAttachmentPosted'` INT, `'positiveReviews'` INT, `'sizeAttachmentPosted'` INT);
 
 -- -----------------------------------------------------
+-- Placeholder table for view `codeface`.`view_assignment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `codeface`.`view_assignment` (`issueId` INT, `projectId` INT, `component` INT, `priority` INT, `severity` INT, `developerName` INT, `isOpen` INT, `positiveReviews` INT, `issueAssigned` INT, `numAttachmentPosted` INT, `numCommentPosted` INT, `sizeAttachmentPosted` INT, `'devAvgTime'` INT, `bugAvgETA` INT);
+
+-- -----------------------------------------------------
+-- Placeholder table for view `codeface`.`view_real_check`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `codeface`.`view_real_check` (`projectId` INT, `issueId` INT, `developerName` INT);
+
+-- -----------------------------------------------------
 -- View `codeface`.`view_bug`
 -- -----------------------------------------------------
 DROP VIEW IF EXISTS `codeface`.`view_bug` ;
@@ -1703,6 +1712,50 @@ FROM
 				developerName, projectId, component, priority, isOpen) r
 GROUP BY
 		r.developerName, r.projectId, r.component, r.priority, r.isOpen;
+
+-- -----------------------------------------------------
+-- View `codeface`.`view_assignment`
+-- -----------------------------------------------------
+DROP VIEW IF EXISTS `codeface`.`view_assignment` ;
+DROP TABLE IF EXISTS `codeface`.`view_assignment`;
+USE `codeface`;
+CREATE OR REPLACE VIEW `view_assignment` AS
+
+SELECT b.issueId, b.projectId, b.component, b.priority, b.severity, d.developerName, d.isOpen, d.positiveReviews,
+		d.issueAssigned, d.numAttachmentPosted, d.numCommentPosted, d.sizeAttachmentPosted, df.avgTime as 'devAvgTime', dr.bugAvgETA
+FROM
+		view_bug b
+        JOIN view_developer d ON (b.projectId = d.projectId AND b.component = d.component AND b.priority = d.priority)
+        JOIN view_developer df ON (b.projectId = df.projectId AND b.component = df.component AND b.priority = df.priority AND d.developerName = df.developerName)
+        JOIN (SELECT d.projectId, d.component, d.priority, floor(avg(d.avgTime)) as 'bugAvgETA'
+				FROM view_developer d WHERE isOpen = 0 GROUP BY d.projectId, d.component, d.priority ) dr ON (b.projectId = dr.projectId AND b.component = dr.component AND b.priority = dr.priority)
+WHERE
+		df.isOpen = 0 -- Estimated time based on already fixed bugs
+        AND df.avgTime > 0 -- Only developers with at least a bug fixed
+        -- AND (SELECT floor(avg(ddf.avgTime)) FROM view_developer ddf
+			 -- WHERE ddf.projectId = d.projectId AND ddf.component = d.component AND ddf.priority = d.priority) > df.avgTime * d.issueAssigned * d.isOpen -- Only developers with a good resolution time
+GROUP BY
+		b.issueId, b.projectId, b.component, b.priority, b.severity, d.developerName, d.isOpen, df.avgTime, dr.bugAvgETA
+ORDER BY
+		b.projectId asc, b.priorityValue asc, b.severityValue asc, b.numBlockedIssues desc, b.votes desc, b.developersInterested desc, b.pendingTime desc, b.component asc, d.isOpen asc,
+        d.positiveReviews desc, d.issueAssigned desc, d.numAttachmentPosted desc, d.numCommentPosted desc, d.sizeAttachmentPosted desc, df.avgTime asc, dr.bugAvgETA asc;
+
+-- -----------------------------------------------------
+-- View `codeface`.`view_real_check`
+-- -----------------------------------------------------
+DROP VIEW IF EXISTS `codeface`.`view_real_check` ;
+DROP TABLE IF EXISTS `codeface`.`view_real_check`;
+USE `codeface`;
+CREATE OR REPLACE VIEW `view_real_check` AS
+SELECT
+		a.projectId, a.issueId, a.developerName
+FROM
+		issue_assignment a LEFT JOIN issue_data i ON (a.issueId = i.issueId AND
+				a.projectId = i.projectId AND a.developerName = i.realAssignee)
+WHERE
+		i.realAssignee <> NULL
+ORDER BY
+		a.projectId ASC, a.issueId ASC, a.developerName ASC;
 USE `codeface`;
 
 DELIMITER $$
@@ -1733,12 +1786,7 @@ BEGIN
 		-- Calculate the time spent to fix for fixed bugs
 		UPDATE issue_data i
 		SET spentTime = TIMESTAMPDIFF(MINUTE, d, lastResolved)
-		WHERE lastResolved IS NOT NULL AND issueId = new.issueId AND projectId = new.projectId;
-        
-        -- Calculate the time already spent to fix for open bugs
-		UPDATE issue_data i
-		SET spentTime = TIMESTAMPDIFF(MINUTE, d, NOW())
-		WHERE lastResolved IS NULL AND issueId = new.issueId AND projectId = new.projectId;        
+		WHERE lastResolved IS NOT NULL AND issueId = new.issueId AND projectId = new.projectId;        
     END IF;
 END$$
 
