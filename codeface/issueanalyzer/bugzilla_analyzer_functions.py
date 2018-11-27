@@ -77,7 +77,7 @@ def getQueryParams(conf, queryType, idParam = [], bugStatus = []):
         # Get bugs assigned in the last [x] days (used to get a list of active developers)
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugOpenedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
-                     "&chfield=assigned_to&chfieldfrom={}&chfieldto=Now&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
+                     "&chfield=assigned_to&chfieldfrom={}&chfieldto=Now&f1=assigned_to&o1=notequals&v1=nobody%40mozilla.org" \
                      "&priority={}&priority={}&product={}&resolution=---").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_BUG_OPEN_NOT_ASSIGNED:
@@ -85,19 +85,19 @@ def getQueryParams(conf, queryType, idParam = [], bugStatus = []):
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugOpenedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
                      "&bug_status=NEW&bug_status=ASSIGNED&is_private=&chfield=[Bug creation]&chfieldfrom={}&chfieldto=Now" \
-                     "&v1=nobody%40mozilla.org&f1=assigned_to&o1=exact&priority={}&priority={}&product={}&resolution=---").format(
+                     "&f1=assigned_to&o1=equals&v1=nobody%40mozilla.org&priority={}&priority={}&product={}&resolution=---").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_BUG_CLOSED_FIXED:
         # Get bugs fixed and resolved in the last [x] days (used to get a list of active developers)
         date = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
-                     "&chfield=resolution&chfieldfrom={}&chfieldto=Now&chfieldvalue=FIXED&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
+                     "&chfield=resolution&chfieldfrom={}&chfieldto=Now&chfieldvalue=FIXED&f1=assigned_to&o1=notequals&v1=nobody%40mozilla.org" \
                      "&priority={}&priority={}&product={}&resolution=FIXED").format(
                          conf['issueAnalyzerURL'], date, conf["issueAnalyzerPriority1"], conf["issueAnalyzerPriority2"], conf["issueAnalyzerProduct"])
     elif queryType == QUERY_BUG_CLOSED_FIXED_PREVIOUS:
         # Get bugs fixed and resolved in the not last [x] days (used to get a list of bugs and developer for simulation)
-        dateFrom = (datetime.today() - timedelta(days=2*conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
-        dateTo = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"])).strftime("%Y-%m-%d")
+        dateFrom = (datetime.today() - timedelta(days=conf["issueAnalyzerBugFixedDays"]+conf["issueAnalyzerBugOpenedDays"])).strftime("%Y-%m-%d")
+        dateTo = (datetime.today() - timedelta(days=conf["issueAnalyzerBugOpenedDays"])).strftime("%Y-%m-%d")
         params = str("{}rest/bug?include_fields=id,assigned_to,blocks,cc,cf_last_resolved,component,creation_time,creator,comment_count,depends_on,keywords,is_open,priority,resolution,severity,summary,status,votes" \
                      "&chfield=resolution&chfieldfrom={}&chfieldto={}&chfieldvalue=FIXED&v1=nobody%40mozilla.org&f1=assigned_to&o1=notequals" \
                      "&priority={}&priority={}&product={}&resolution=FIXED").format(

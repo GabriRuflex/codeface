@@ -104,8 +104,6 @@ def scratch(issueAnalyzer):
         numBugs = len(restResult["bugs"])
         for i in range(0, numBugs/3):
             bug = restResult["bugs"][random.randint(0, numBugs-1)]
-            if bug["assigned_to_detail"]["name"] == "nobody@mozilla.org":
-                tempResult.append(str("{} e {}").format(bug["id"],bug["realassignee"]))
 
             # Save the real assignee
             bug["realassignee"] = bug["assigned_to_detail"]["name"]
@@ -115,8 +113,6 @@ def scratch(issueAnalyzer):
             bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
                                          "real_name" : "Nobody; OK to take it and work on it"}
             bug["is_open"] = True
-
-        log.critical(",".join(tempResult))
 
     # Get all open bugs not assigned
     result = functions.scratchBugOpenNotAssigned(conf)
