@@ -19,6 +19,7 @@ Bugzilla IssueAnalyzer module
 """
 
 import random
+import time
 from datetime import datetime
 from logging import getLogger; log = getLogger(__name__)
 
@@ -189,79 +190,154 @@ def scratch(issueAnalyzer):
     # Store the relations url
     urlResult[utils.KEY_ITEMS_RELATIONS] = utils.getUrlByRunMode(result.url, runMode)
 
+    # Set queries limits
+    maxBugs = 200
+    numBugs = len(bugResult.keys())
+    rangeBugs = (numBugs/maxBugs) + 1
+
     # Get attachments of bugs
-    c = 0
     missedCreator = set()
-    result = functions.scratchBugListAttachments(conf, bugResult.keys()[:200])
-    if result.ok:
-        restResult = result.json()
-        num = len(restResult["bugs"])
-        for bug in restResult["bugs"]:
-            # Get only bugs with attachments
-            if not restResult["bugs"][bug] == []:
-                attachmentResult[bug] = restResult["bugs"][bug]
 
-                # For each attachments, get informations on creator and count the positive reviews
-                for att in attachmentResult[bug]:
-                    if not att["creator"] in devResult:
-                        missedCreator.add(utils.encodeURIWithUTF8(att["creator"]))
-                    
-                    positive_reviews = 0
-                    for flag in att["flags"]:
-                        if flag["status"] == "+":
-                            positive_reviews = positive_reviews + 1
-                            
-                    att["positive_reviews"] = positive_reviews
-                c = c + len(attachmentResult[bug])
+    # Attachments counter total
+    ct = 0
+    # Attachments deleted counter total
+    dt = 0
 
-        r = functions.scratchDeveloperList(conf, missedCreator)
-        if r.ok:
-            creatorResult = r.json()
-            for creator in creatorResult["users"]:
-                devResult[creator["name"]] = creator
+    for n in range(rangeBugs):
+        f = (n+1)*maxBugs if (n+1)*maxBugs<numBugs else numBugs
+        i = n*maxBugs
+        result = functions.scratchBugListAttachments(conf, bugResult.keys()[i:f])
+        if result.ok:
+            restResult = result.json()
+            num = len(restResult["bugs"])
+            c = 0
+            d = 0
+            for bug in restResult["bugs"]:
+                # Get only bugs with attachments
+                if not restResult["bugs"][bug] == []:
+                    attachmentResult[bug] = restResult["bugs"][bug]
+
+                    # For each attachments, get informations on creator and count the positive reviews
+                    for att in attachmentResult[bug]:
+                        if not att["creator"] in devResult:
+                            missedCreator.add(utils.encodeURIWithUTF8(att["creator"]))
+                        
+                        positive_reviews = 0
+                        for flag in att["flags"]:
+                            if flag["status"] == "+":
+                                positive_reviews = positive_reviews + 1
+                                
+                        att["positive_reviews"] = positive_reviews
+                    c = c + len(attachmentResult[bug])
+                else:
+                    d = d + 1
+            log.info(str("Attachments ({}/{}): {}. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(
+                n+1,rangeBugs,c,num,d,num-d,len(result.content)))
+
+            # Update total counters
+            ct = ct + c
+            dt = dt + d
+
+            # Wait 5 seconds to run the other queries
+            time.sleep(5)
         else:
-            log.info("Attachments missed creators: connection error.")
-                            
-        log.info(str("Attachments: {}. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}. Creators added: {}").format(
-            c,num,num-len(attachmentResult),len(attachmentResult),len(result.content), len(missedCreator)))
+            log.info("Attachments: connection error.")
+
+
+    r = functions.scratchDeveloperList(conf, missedCreator)
+    if r.ok:
+        creatorResult = r.json()
+        for creator in creatorResult["users"]:
+            devResult[creator["name"]] = creator
     else:
-        log.info(str("Attachments: connection error. {}").format(r.query))
+        log.info("Attachments missed creators: connection error.")
+                        
+    log.info(str("Attachments: {}. Bugs: {}. Deleted: {}. Remains: {}. Creators added: {}.").format(
+        ct,numBugs,dt,len(attachmentResult), len(missedCreator)))
 
     # Store the attachments url
     urlResult[utils.KEY_ITEMS_ATTACHMENTS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Get comments of bugs
-    c = 0
-    result = functions.scratchBugListComments(conf, bugResult.keys()[:200])
-    if result.ok:
-        restResult = result.json()
-        num = len(restResult["bugs"])
-        for bug in restResult["bugs"]:
-            # Get only bugs with comments
-            if not restResult["bugs"][bug]["comments"] == []:
-                commentResult[bug] = restResult["bugs"][bug]["comments"]
-                c = c + len(commentResult[bug])
 
-        log.info(str("Comments: {}. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(c,num,num-len(commentResult),len(commentResult),len(result.content)))
-    else:
-        log.info("Comments: connection error.")
+    # Comments counter total
+    ct = 0
+    # Comments deleted counter total
+    dt = 0
+
+    for n in range(rangeBugs):
+        f = (n+1)*maxBugs if (n+1)*maxBugs<numBugs else numBugs
+        i = n*maxBugs
+        result = functions.scratchBugListComments(conf, bugResult.keys()[i:f])
+        if result.ok:
+            restResult = result.json()
+            num = len(restResult["bugs"])
+            c = 0
+            d = 0
+            for bug in restResult["bugs"]:
+                # Get only bugs with comments
+                if not restResult["bugs"][bug]["comments"] == []:
+                    commentResult[bug] = restResult["bugs"][bug]["comments"]
+                    c = c + len(commentResult[bug])
+                else:
+                    d = d + 1
+
+            log.info(str("Comments ({}/{}): {}. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(
+                n+1,rangeBugs,c,num,d,num-d,len(result.content)))
+
+            # Update total counters
+            ct = ct + c
+            dt = dt + d
+
+            # Wait 5 seconds to run the other queries
+            time.sleep(5)
+        else:
+            log.info("Comments: connection error.")
+
+    log.info(str("Comments: {}. Bugs: {}. Deleted: {}. Remains: {}.").format(
+        ct,numBugs,dt,len(commentResult)))
 
     # Store the comments url
     urlResult[utils.KEY_ITEMS_COMMENTS] = utils.getUrlByRunMode(result.url, runMode)
 
     # Get history of bugs
-    result = functions.scratchBugListHistory(conf, bugResult.keys()[:200])
-    if result.ok:
-        restResult = result.json()
-        num = len(restResult["bugs"])
-        for bug in restResult["bugs"]:
-            # Get only bugs with a not empty history
-            if not bug["history"] == []:
-                historyResult[bug["id"]] = bug
-        
-        log.info(str("History entries. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(num,num-len(historyResult),len(historyResult),len(result.content)))
-    else:
-        log.info("History: connection error.")
+
+    # History counter total
+    ct = 0
+    # History deleted counter total
+    dt = 0
+
+    for n in range(rangeBugs):
+        f = (n+1)*maxBugs if (n+1)*maxBugs<numBugs else numBugs
+        i = n*maxBugs
+        result = functions.scratchBugListHistory(conf, bugResult.keys()[i:f])
+        if result.ok:
+            restResult = result.json()
+            num = len(restResult["bugs"])
+            c = 0
+            d = 0
+            for bug in restResult["bugs"]:
+                # Get only bugs with a not empty history
+                if not bug["history"] == []:
+                    historyResult[bug["id"]] = bug
+                    c = c + 1
+                else:
+                    d = d + 1
+
+            log.info(str("History entries ({}/{}): {}. Bugs: {}. Deleted: {}. Remains: {}. Byte: {}.").format(
+                n+1,rangeBugs,c,num,d,num-d,len(result.content)))
+
+            # Update total counters
+            ct = ct + c
+            dt = dt + d
+
+            # Wait 5 seconds to run the other queries
+            time.sleep(5)
+        else:
+            log.info("History: connection error.")
+
+    log.info(str("History entries: {}. Bugs: {}. Deleted: {}. Remains: {}.").format(
+        ct,numBugs,dt,len(historyResult)))
 
     # Store the history url
     urlResult[utils.KEY_ITEMS_HISTORY] = utils.getUrlByRunMode(result.url, runMode)
