@@ -199,6 +199,8 @@ class IssueAnalyzer(object):
                     # Analyze issues already stored if "--scratchOnly" flag is not set
                     self.analyze()
 
+            log.info("Completed!")
+
     def scratch(self):
         # Start scratching
         bugzilla.scratch(self)
