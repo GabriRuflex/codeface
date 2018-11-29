@@ -425,13 +425,14 @@ def analyze(issueAnalyzer):
         elif  bugResult[bug]["severity"] == conf['issueAnalyzerSeverity6']:
             severityValue = 6
 
-        spentTime = None
-        if bugResult[bug]["cf_last_resolved"] is not None:
-            spentTime = utils.convertToDateTime(bugResult[bug]["cf_last_resolved"]) - utils.convertToDateTime(bugResult[bug]["creation_time"])
-            spentTime = spentTime.days * 24 * 60 + spentTime.seconds / 60 # Time in minutes
-        else:
-            spentTime = datetime.now() - utils.convertToDateTime(bugResult[bug]["creation_time"])
-            spentTime = spentTime.days * 24 * 60 + spentTime.seconds / 60 # Time in minutes
+        spentTime = 0
+        if bugResult[bug]["assigned_to"] <> "nobody@mozilla.org":
+            if bugResult[bug]["cf_last_resolved"] is not None:
+                spentTime = utils.convertToDateTime(bugResult[bug]["cf_last_resolved"]) - utils.convertToDateTime(bugResult[bug]["creation_time"])
+                spentTime = spentTime.days * 24 * 60 + spentTime.seconds / 60 # Time in minutes
+            else:
+                spentTime = datetime.now() - utils.convertToDateTime(bugResult[bug]["creation_time"])
+                spentTime = spentTime.days * 24 * 60 + spentTime.seconds / 60 # Time in minutes
 
         realAssignee = "NULL"
         if "realassignee" in bugResult[bug].keys():

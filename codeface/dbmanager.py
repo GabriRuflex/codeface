@@ -626,8 +626,11 @@ class DBManager:
         """
         Get the developers' statistics data related to the project.
         """
-        self.doExec("select ifnull(sum(ic.spentTime), 0) as 'timeAvailable', ifnull(sum(io.spentTime), 0) as 'timeAssigned' from issue_data io, issue_data ic where io.assignedTo='{0}' and " \
-                    "ic.assignedTo='{0}' and io.isOpen=1 and ic.isOpen=0 and io.projectId={1} and ic.projectId={1}".format(developerName, projectId))
+        self.doExec("select ifnull(sum(ic.spentTime), 0) as 'timeAvailable', ifnull(sum(io.spentTime), 0) as 'timeAssigned' " \
+                    "from issue_data io, issue_data ic " \
+                    "where io.assignedTo='{0}' and ic.assignedTo='{0}' and  " \
+                    "io.isOpen=1 and ic.isOpen=0 and " \
+                    "io.projectId={1} and ic.projectId={1}".format(developerName, projectId))
         if self.cur.rowcount == 0:
             log.debug("Data from project {} not found!".format(projectId))
         return (self.cur)

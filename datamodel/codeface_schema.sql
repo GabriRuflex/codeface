@@ -1545,9 +1545,9 @@ CREATE TABLE IF NOT EXISTS `codeface`.`view_developer` (`developerName` INT, `pr
 CREATE TABLE IF NOT EXISTS `codeface`.`view_assignment` (`issueId` INT, `projectId` INT, `component` INT, `priority` INT, `severity` INT, `developerName` INT, `isOpen` INT, `positiveReviews` INT, `issueAssigned` INT, `numAttachmentPosted` INT, `numCommentPosted` INT, `sizeAttachmentPosted` INT, `'devAvgTime'` INT, `bugAvgETA` INT);
 
 -- -----------------------------------------------------
--- Placeholder table for view `codeface`.`view_real_check`
+-- Placeholder table for view `codeface`.`view_reality_check`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `codeface`.`view_real_check` (`projectId` INT, `issueId` INT, `developerName` INT);
+CREATE TABLE IF NOT EXISTS `codeface`.`view_reality_check` (`projectId` INT, `'TP'` INT, `'FP'` INT, `'FN'` INT, `'P'` INT, `'R'` INT);
 
 -- -----------------------------------------------------
 -- View `codeface`.`view_bug`
@@ -1574,7 +1574,7 @@ FROM
         LEFT JOIN (SELECT issueId, projectId, count(relatedIssueId) as 'numBlockedIssues' FROM issue_dependencies
 				WHERE relationType = "blocks" GROUP BY issueId, projectId) b ON (i.issueId = b.issueId AND i.projectId = b.projectId)
 WHERE
-		i.isOpen = true
+		i.isOpen = 1 AND i.assignedTo = "nobody@mozilla.org"
 GROUP BY
 		i.issueId, i.projectId, i.priority, i.priorityValue, i.severity, i.severityValue, b.numBlockedIssues, i.votes, i.component
 ORDER BY
@@ -1741,21 +1741,36 @@ ORDER BY
         d.positiveReviews desc, d.issueAssigned desc, d.numAttachmentPosted desc, d.numCommentPosted desc, d.sizeAttachmentPosted desc, df.avgTime asc, dr.bugAvgETA asc;
 
 -- -----------------------------------------------------
--- View `codeface`.`view_real_check`
+-- View `codeface`.`view_reality_check`
 -- -----------------------------------------------------
-DROP VIEW IF EXISTS `codeface`.`view_real_check` ;
-DROP TABLE IF EXISTS `codeface`.`view_real_check`;
+DROP VIEW IF EXISTS `codeface`.`view_reality_check` ;
+DROP TABLE IF EXISTS `codeface`.`view_reality_check`;
 USE `codeface`;
-CREATE OR REPLACE VIEW `view_real_check` AS
+CREATE OR REPLACE VIEW `view_reality_check` AS
 SELECT
-		a.projectId, a.issueId, a.developerName
+		TTP.projectId,
+        TTP.NUM as 'TP',  TFP.NUM as 'FP', COUNT(i3.issueId) - TTP.NUM as 'FN',
+        TTP.NUM/(TTP.NUM+TFP.NUM) AS 'P', TTP.NUM/(TTP.NUM+(COUNT(i3.issueId) - TTP.NUM)) AS 'R'
 FROM
-		issue_assignment a LEFT JOIN issue_data i ON (a.issueId = i.issueId AND
-				a.projectId = i.projectId AND a.developerName = i.realAssignee)
+		(SELECT a1.projectId, COUNT(a1.issueId) AS NUM
+				FROM issue_assignment a1 JOIN issue_data i1 ON (a1.issueId = i1.issueId AND
+				a1.projectId = i1.projectId AND a1.developerName = i1.realAssignee)
+                WHERE i1.realAssignee <> NULL
+                GROUP BY a1.projectId) AS TTP,
+		(SELECT a2.projectId, COUNT(a2.issueId) AS NUM
+				FROM issue_assignment a2 JOIN issue_data i2 ON (a2.issueId = i2.issueId AND
+				a2.projectId = i2.projectId AND a2.developerName <> i2.realAssignee)
+                WHERE i2.realAssignee <> NULL
+                GROUP BY a2.projectId) AS TFP,
+		issue_data i3
 WHERE
-		i.realAssignee <> NULL
+        i3.realAssignee <> NULL AND
+        TTP.projectId = TFP.projectId AND
+        TTP.projectId = i3.projectId
+GROUP BY
+		TTP.projectId
 ORDER BY
-		a.projectId ASC, a.issueId ASC, a.developerName ASC;
+		TTP.projectId ASC;
 USE `codeface`;
 
 DELIMITER $$
@@ -1786,7 +1801,8 @@ BEGIN
 		-- Calculate the time spent to fix for fixed bugs
 		UPDATE issue_data i
 		SET spentTime = TIMESTAMPDIFF(MINUTE, d, lastResolved)
-		WHERE lastResolved IS NOT NULL AND issueId = new.issueId AND projectId = new.projectId;        
+		WHERE lastResolved IS NOT NULL AND d < lastResolved AND
+        issueId = new.issueId AND projectId = new.projectId;        
     END IF;
 END$$
 
