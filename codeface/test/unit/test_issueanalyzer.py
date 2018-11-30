@@ -93,6 +93,9 @@ class TestIssueAnalyzer(unittest.TestCase):
             issueAnalyzerBugFixedDays: 90
             issueAnalyzerPriority1: P1
             issueAnalyzerPriority2: P2
+            issueAnalyzerPriority3: P3
+            issueAnalyzerPriority4: P4
+            issueAnalyzerPriority5: P5
             issueAnalyzerSeverity1: blocker
             issueAnalyzerSeverity2: critical
             issueAnalyzerSeverity3: major
@@ -329,6 +332,9 @@ class TestIssueAnalyzer(unittest.TestCase):
         self.assertEqual(self.conf["issueAnalyzerBugFixedDays"], 90)
         self.assertEqual(self.conf["issueAnalyzerPriority1"], "P1")
         self.assertEqual(self.conf["issueAnalyzerPriority2"], "P2")
+        self.assertEqual(self.conf["issueAnalyzerPriority3"], "P3")
+        self.assertEqual(self.conf["issueAnalyzerPriority4"], "P4")
+        self.assertEqual(self.conf["issueAnalyzerPriority5"], "P5")
         self.assertEqual(self.conf["issueAnalyzerSeverity1"], "blocker")
         self.assertEqual(self.conf["issueAnalyzerSeverity2"], "critical")
         self.assertEqual(self.conf["issueAnalyzerSeverity3"], "major")

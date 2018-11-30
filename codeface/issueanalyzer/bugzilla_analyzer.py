@@ -30,6 +30,7 @@ from codeface.configuration import Configuration
 from codeface.dbmanager import DBManager
 from codeface.util import BatchJobPool
 
+SHOW_DEBUG = 0
 MORE_DEVELOPERS = 0
 
 # SQL results
@@ -81,16 +82,39 @@ def scratch(issueAnalyzer):
     historyResult = dict()
     relationResult = dict()
 
-    tempResult = []
-
     conf = issueAnalyzer.conf
     runMode = issueAnalyzer.runMode
+
+    # Get and append all assigned open bugs
+    result = functions.scratchBugOpenAssigned(conf)
+    if result.ok:
+        restResult = result.json()
+
+        log.info(str("Bug assigned and open. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
+    else:
+        log.info("Bug assigned and open: connection error.")
+
+    if runMode == utils.RUN_MODE_TEST:
+        # Get a subset of fixed bug an mark them as open and unassigned
+        numBugs = len(restResult["bugs"])
+        for i in range(0, numBugs): #numBugs/3
+            bug = restResult["bugs"][i] #random.randint(0, numBugs-1)
+
+            if "realassignee" not in bug.keys():
+                # Save the real assignee
+                bug["realassignee"] = bug["assigned_to_detail"]["name"]
+
+                # Unassign the bug and make it open
+                bug["assigned_to"] = "nobody@mozilla.org"
+                bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
+                                             "real_name" : "Nobody; OK to take it and work on it"}
+                bug["is_open"] = True
 
     # Get and append all assigned fixed bugs
     previousPeriod = runMode == utils.RUN_MODE_TEST
     result = functions.scratchBugClosedFixed(conf, previousPeriod)
     if result.ok:
-        restResult = result.json()
+        restResult["bugs"] = restResult["bugs"] + result.json()["bugs"]
 
         log.info(str("Bug assigned and fixed. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
     else:
@@ -98,22 +122,6 @@ def scratch(issueAnalyzer):
 
     # Store the developers url
     urlResult[utils.KEY_ITEMS_DEVELOPERS] = utils.getUrlByRunMode(result.url, runMode)
-
-    c = 0
-    if not runMode == utils.RUN_MODE_ANALYSIS:
-        # Get a subset of fixed bug an mark them as open and unassigned
-        numBugs = len(restResult["bugs"])
-        for i in range(0, numBugs/3):
-            bug = restResult["bugs"][random.randint(0, numBugs-1)]
-
-            # Save the real assignee
-            bug["realassignee"] = bug["assigned_to_detail"]["name"]
-
-            # Unassign the bug and make it open
-            bug["assigned_to"] = "nobody@mozilla.org"
-            bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
-                                         "real_name" : "Nobody; OK to take it and work on it"}
-            bug["is_open"] = True
 
     # Get all open bugs not assigned
     result = functions.scratchBugOpenNotAssigned(conf)
@@ -123,15 +131,6 @@ def scratch(issueAnalyzer):
         log.info(str("Bug not assigned and open. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
     else:
         log.info("Bug not assigned and open: connection error.")
-    
-    # Get and append all assigned open bugs
-    result = functions.scratchBugOpenAssigned(conf)
-    if result.ok:
-        restResult["bugs"] = restResult["bugs"] + result.json()["bugs"]
-
-        log.info(str("Bug assigned and open. Bugs: {}. Byte: {}.").format(len(result.json()["bugs"]),len(result.content)))
-    else:
-        log.info("Bug assigned and open: connection error.")
 
     # Store the bugs url
     urlResult[utils.KEY_ITEMS_BUGS] = utils.getUrlByRunMode(result.url, runMode)
@@ -407,9 +406,17 @@ def analyze(issueAnalyzer):
     issue_cclist = list()
     for bug in bugResult:
         # Parse the issue data
-        priorityValue = 2
+        priorityValue = 6
         if bugResult[bug]["priority"] == conf['issueAnalyzerPriority1']:
             priorityValue = 1
+        if bugResult[bug]["priority"] == conf['issueAnalyzerPriority2']:
+            priorityValue = 2
+        if bugResult[bug]["priority"] == conf['issueAnalyzerPriority3']:
+            priorityValue = 3
+        if bugResult[bug]["priority"] == conf['issueAnalyzerPriority4']:
+            priorityValue = 4
+        if bugResult[bug]["priority"] == conf['issueAnalyzerPriority5']:
+            priorityValue = 5
 
         severityValue = 7
         if bugResult[bug]["severity"] == conf['issueAnalyzerSeverity1']:
@@ -710,11 +717,8 @@ def getResult(issueAnalyzer, projectId):
             avgDevAvgTime = stat["avgDevAvgTime"]
 
             # Get the stats related to the developer
-            result = dbm.get_issue_developer_statistics(projectId, developer)
-            statRow = result.fetchone()
-
-            timeAvailable = statRow[0]
-            timeUnavailable = statRow[1]
+            timeAvailable = dbm.get_issue_developer_statistics(projectId, developer, 0)
+            timeUnavailable = dbm.get_issue_developer_statistics(projectId, developer, 1)
             
             timeAssignments = developerTimeAssignments[developer] if developer in developerTimeAssignments.keys() else 0
             #log.info(str("DEV: {} TIME ASSIGNMENTS: {}").format(developer, timeAssignments))
@@ -748,6 +752,9 @@ def getResult(issueAnalyzer, projectId):
 
                 # If the rank is the best for this bug, assign it to the developer
                 if rank > assigneeRank:
+                    if SHOW_DEBUG:
+                        log.info(str("Bug {} assigned to {} with rank {} (avail.: {}, coll.: {}, comp.: {}, produc.: {}, reliab.: {})").format(
+                            bug,dev["developer"],rank,availability,collaborativity,competency,productivity,reliability))
                     assignee = developer
                     assigneeRank = rank
                     
@@ -755,8 +762,11 @@ def getResult(issueAnalyzer, projectId):
                     res = utils.safeSetDeveloper(developers, devKey, "numAssigned", assigneeNumAssigned,
                                                     ["reviews", "numAssigned", "numAttachment", "numComment", "sizeAttachment", "devAvgTime", "bugAvgETA"])
 
-                    timeAssignments = timeAssignments+bugAvgETA
+                    timeAssignments = timeAssignments+devAvgTime
                     developerTimeAssignments[developer] = timeAssignments
+                elif SHOW_DEBUG:
+                    log.info(str("Bug {} not assigned to {} (rank: {}). Already assigned to: {} (rank: {}").format(
+                        bug,dev["developer"],rank,assignee,assigneeRank))
 
         # Store the assignee if he/she exists
         if not assignee is None:
@@ -769,9 +779,16 @@ def getResult(issueAnalyzer, projectId):
 
     # Check the degree of compliance
     if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
-        realCheckResult = dbm.get_view_real_check(projectId)
-        (numRealCheckResults,)= realCheckResult.fetchone()
+        realityCheckResult = dbm.get_view_reality_check(projectId)
+        (truePositive, falsePositive, falseNegative)= realityCheckResult.fetchone()
 
-        log.info(str("Real check assignments value: {}%.").format(numRealCheckResults/len(assignmentResults)*100))
+        # Calculate the Precision, Recall and FMeasure values
+        P = truePositive/(truePositive+falseNegative)
+        R = truePositive/(truePositive+falsePositive)
+        F = 0
+        if P+R>0:
+            F = 2*P*R/(P+R)
+        log.info(str("Reality check assignments values: TruePos: {} - FalsePos: {} - FalseNeg: {} - Precision: {} - Recall: {} - FMeasure: {}.").format(
+            truePositive, falsePositive, falseNegative, P, R, F))
 
     log.info("Analysis is terminated.")

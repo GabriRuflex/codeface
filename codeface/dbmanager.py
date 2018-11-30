@@ -610,30 +610,32 @@ class DBManager:
             log.debug("Data from project {} not found!".format(projectId))
         return (self.cur)
 
-    def get_view_real_check(self, projectId):
+    def get_view_reality_check(self, projectId):
         """
         Get the developers' assignment real check data related to the project.
         """
         sqlQuery = ""
-        sqlQuery = "select count(*) " \
-                   "from view_real_check where projectId = {}".format(projectId)
+        sqlQuery = "select TP, FP, FN " \
+                   "from view_reality_check where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
         if self.cur.rowcount == 0:
             log.debug("Data from project {} not found!".format(projectId))
         return (self.cur)
 
-    def get_issue_developer_statistics(self, projectId, developerName):
+    def get_issue_developer_statistics(self, projectId, developerName, isOpen):
         """
         Get the developers' statistics data related to the project.
         """
-        self.doExec("select ifnull(sum(ic.spentTime), 0) as 'timeAvailable', ifnull(sum(io.spentTime), 0) as 'timeAssigned' " \
-                    "from issue_data io, issue_data ic " \
-                    "where io.assignedTo='{0}' and ic.assignedTo='{0}' and  " \
-                    "io.isOpen=1 and ic.isOpen=0 and " \
-                    "io.projectId={1} and ic.projectId={1}".format(developerName, projectId))
+        self.doExec("SELECT stat.spentTime " \
+                    "FROM view_developer_statistic stat " \
+                    "WHERE stat.projectId = {0} and stat.assignedTo = '{1}' and stat.isOpen = {2}".format(projectId, developerName, isOpen))
+
+        result = 0
         if self.cur.rowcount == 0:
             log.debug("Data from project {} not found!".format(projectId))
-        return (self.cur)
+        else:
+            result = self.cur.fetchone()[0]
+        return (result)
 
     def reset_issue_database(self, pid = ""):
         """

@@ -50,8 +50,9 @@ class Configuration(Mapping):
                      'issueAnalyzerProjectName', 'issueAnalyzerType', 'issueAnalyzerURL',
                      'issueAnalyzerTimeIncrement', 'issueAnalyzerAvailability', 'issueAnalyzerCollaborativity',
                      'issueAnalyzerCompetency', 'issueAnalyzerProductivity', 'issueAnalyzerReliability',
-                     'issueAnalyzerProduct', 'issueAnalyzerBugOpenedDays', 'issueAnalyzerBugFixedDays',
-                     'issueAnalyzerPriority1', 'issueAnalyzerPriority2', 'issueAnalyzerSeverity1',
+                     'issueAnalyzerProduct', 'issueAnalyzerComponent', 'issueAnalyzerBugOpenedDays', 'issueAnalyzerBugFixedDays',
+                     'issueAnalyzerPriority1', 'issueAnalyzerPriority2', 'issueAnalyzerPriority3',
+                     'issueAnalyzerPriority4', 'issueAnalyzerPriority5', 'issueAnalyzerSeverity1',
                      'issueAnalyzerSeverity2', 'issueAnalyzerSeverity3', 'issueAnalyzerSeverity4',
                      'issueAnalyzerSeverity5', 'issueAnalyzerSeverity6', 'issueAnalyzerSeverity7')
     ALL_KEYS = set(GLOBAL_KEYS + GLOBAL_OPTIONAL_KEYS + PROJECT_KEYS +

@@ -52,7 +52,7 @@ class IssueAnalyzer(object):
                 issueAnalyzerReliability: Coefficient of reliability quality parameter                
                 issueAnalyzerBugOpenedDays: Max days for open bugs
                 issueAnalyzerBugFixedDays: Max days for fixed bugs
-                issueAnalyzerPriority1-2: Name of priority fields to analyze
+                issueAnalyzerPriority1-5: Name of priority fields to analyze
                 issueAnalyzerSeverity1-7: Name of severity fields to analyze
             cacheDirectory(str): Path of the cache directory
             flags(tuple):
