@@ -95,20 +95,19 @@ def scratch(issueAnalyzer):
         log.info("Bug assigned and open: connection error.")
 
     if runMode == utils.RUN_MODE_TEST:
-        # Get a subset of fixed bug an mark them as open and unassigned
+        # Get all open and assigned bug an mark them as unassigned
         numBugs = len(restResult["bugs"])
-        for i in range(0, numBugs): #numBugs/3
-            bug = restResult["bugs"][i] #random.randint(0, numBugs-1)
+        for i in range(0, numBugs):
+            # Get the bug
+            bug = restResult["bugs"][i]
 
-            if "realassignee" not in bug.keys():
-                # Save the real assignee
-                bug["realassignee"] = bug["assigned_to_detail"]["name"]
+            # Save the real assignee
+            bug["realassignee"] = bug["assigned_to_detail"]["name"]
 
-                # Unassign the bug and make it open
-                bug["assigned_to"] = "nobody@mozilla.org"
-                bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
-                                             "real_name" : "Nobody; OK to take it and work on it"}
-                bug["is_open"] = True
+            # Unassign the bug
+            bug["assigned_to"] = "nobody@mozilla.org"
+            bug["assigned_to_detail"] = {"email" : "nobody@mozilla.org", "id" : 1, "name" : "nobody@mozilla.org",
+                                         "real_name" : "Nobody; OK to take it and work on it"}
 
     # Get and append all assigned fixed bugs
     previousPeriod = runMode == utils.RUN_MODE_TEST
@@ -653,20 +652,25 @@ def getResult(issueAnalyzer, projectId):
     assignmentResults = dict()
     issue_assignment = list()
     developerTimeAssignments = dict()
+    developerBusyDict = dict()
     for bug in bugAssignments.keys():
         # Initialize the assignee variables
         assignee = None
+        assigneeTime = 0
         assigneeRank = -255
         assigneeNumAssigned = -255
 
         analysedDevelopers = list()
         stat = bugStatistics[bug]
         for dev in bugAssignments[bug]:
-            # Don't analyze a developer twice
-            if dev in analysedDevelopers:
+            # Don't analyze developer without time
+            if dev["developer"] in developerBusyDict.keys():
                 continue
 
-            analysedDevelopers.append(dev)
+            # Don't analyze a developer twice for the same bug
+            if dev["developer"] in analysedDevelopers:
+                continue
+            analysedDevelopers.append(dev["developer"])
 
             # Get the developer data
             developer = dev["developer"]
@@ -752,9 +756,19 @@ def getResult(issueAnalyzer, projectId):
 
                 # If the rank is the best for this bug, assign it to the developer
                 if rank > assigneeRank:
+                    # Delete previous developer time assignments
+                    if assignee <> None:
+                        developerTimeAssignments[assignee] -= assigneeTime
+
+                        # Remove developer to busy dict, if present
+                        if assignee in developerBusyDict:
+                            del developerBusyDict[assignee]
+                    
                     if SHOW_DEBUG:
                         log.info(str("Bug {} assigned to {} with rank {} (avail.: {}, coll.: {}, comp.: {}, produc.: {}, reliab.: {})").format(
                             bug,dev["developer"],rank,availability,collaborativity,competency,productivity,reliability))
+
+                    # Set new assignee
                     assignee = developer
                     assigneeRank = rank
                     
@@ -762,11 +776,15 @@ def getResult(issueAnalyzer, projectId):
                     res = utils.safeSetDeveloper(developers, devKey, "numAssigned", assigneeNumAssigned,
                                                     ["reviews", "numAssigned", "numAttachment", "numComment", "sizeAttachment", "devAvgTime", "bugAvgETA"])
 
-                    timeAssignments = timeAssignments+devAvgTime
+                    assigneeTime = devAvgTime
+                    timeAssignments = timeAssignments+assigneeTime
                     developerTimeAssignments[developer] = timeAssignments
                 elif SHOW_DEBUG:
-                    log.info(str("Bug {} not assigned to {} (rank: {}). Already assigned to: {} (rank: {}").format(
-                        bug,dev["developer"],rank,assignee,assigneeRank))
+                    log.info(str("Bug {} not assigned to {} with rank {} (avail.: {}, coll.: {}, comp.: {}, produc.: {}, reliab.: {})").format(
+                        bug,dev["developer"],rank,availability,collaborativity,competency,productivity,reliability))
+            else:
+                # Add developer to busy dict
+                developerBusyDict[developer] = True
 
         # Store the assignee if he/she exists
         if not assignee is None:
@@ -783,12 +801,15 @@ def getResult(issueAnalyzer, projectId):
         (truePositive, falsePositive, falseNegative)= realityCheckResult.fetchone()
 
         # Calculate the Precision, Recall and FMeasure values
-        P = truePositive/(truePositive+falseNegative)
-        R = truePositive/(truePositive+falsePositive)
+        P = truePositive/float(truePositive+falseNegative)
+        R = truePositive/float(truePositive+falsePositive)
         F = 0
         if P+R>0:
             F = 2*P*R/(P+R)
-        log.info(str("Reality check assignments values: TruePos: {} - FalsePos: {} - FalseNeg: {} - Precision: {} - Recall: {} - FMeasure: {}.").format(
-            truePositive, falsePositive, falseNegative, P, R, F))
+
+        log.info(str("Reality check assignments values: TruePositive: {} - FalsePositive: {} - FalseNegative: {} - Precision: {} - Recall: {} - FMeasure: {}.").format(
+            truePositive, falsePositive, falseNegative, round(P,2), round(R,2), round(F,2)))
 
     log.info("Analysis is terminated.")
+    log.info(str("{} {} {} {} {}").format(conf["issueAnalyzerAvailability"],conf["issueAnalyzerCollaborativity"],conf["issueAnalyzerCompetency"], \
+                                          conf["issueAnalyzerProductivity"],conf["issueAnalyzerReliability"]))
