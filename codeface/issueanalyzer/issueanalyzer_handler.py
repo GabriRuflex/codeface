@@ -220,11 +220,11 @@ class IssueAnalyzer(object):
         # Get results from cache
         cache.getFromCache(self) 
 
-        # Start analyzing
-        projectId = bugzilla.analyze(self)
+        # Analyze and import data on database
+        projectId = bugzilla.analyzeAndImport(self)
 
-        # Get the results
-        bugzilla.getResult(self, projectId)
+        # Handle the results
+        bugzilla.handleResult(self, projectId)
 
     # self.__conf
     @property

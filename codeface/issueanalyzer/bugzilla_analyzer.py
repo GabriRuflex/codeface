@@ -20,6 +20,7 @@ Bugzilla IssueAnalyzer module
 
 import random
 import time
+
 from datetime import datetime
 from logging import getLogger; log = getLogger(__name__)
 
@@ -95,7 +96,7 @@ def scratch(issueAnalyzer):
         log.info("Bug assigned and open: connection error.")
 
     if runMode == utils.RUN_MODE_TEST:
-        # Get all open and assigned bug an mark them as unassigned
+        # Set all open and assigned bug as unassigned
         numBugs = len(restResult["bugs"])
         for i in range(0, numBugs):
             # Get the bug
@@ -350,8 +351,8 @@ def scratch(issueAnalyzer):
 
     log.info("Scratching is terminated.")
 
-def analyze(issueAnalyzer):
-    """Function to analyze the given data
+def analyzeAndImport(issueAnalyzer):
+    """Function to analyze and import on the database the given data
 
     Get the project configuration, the dictionaries,
     analyze them and then store the result on database.
@@ -568,17 +569,16 @@ def analyze(issueAnalyzer):
 
     return projectId
 
-def getResult(issueAnalyzer, projectId):
-    """Function to calculate the result of developer-issue assignments
+def handleResult(issueAnalyzer, projectId):
+    """Function to handle the result of developer-issue assignments
 
-    Get the aggregated data from database's views, make the
-    developer-issue assignments and store the result on database.
+    Get the project's configuration and call, if necessary, the grid search routines.
 
     Args:
         issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
         projectId (int): The id of the current project
 
-    Returns None: The result is stored on database
+    Returns None: The result is handled, the score is calculated and printed
 
     """
     conf = issueAnalyzer.conf
@@ -617,7 +617,7 @@ def getResult(issueAnalyzer, projectId):
     bugAssignments = dict()
     developers = dict()
     result = dbm.get_view_assignment(projectId, utils.QUERY_TYPE_ALL_ASSIGNMENTS)
-    nAssignmentResult = result.rowcount
+    nPA = result.rowcount
     row = result.fetchone()
     while row is not None:        
         bugId = row[BUG_ID]
@@ -647,6 +647,40 @@ def getResult(issueAnalyzer, projectId):
                                                                                      "bugAvgETA": bugAvgETA}
 
         row = result.fetchone()
+
+    # Get the results
+    issue_assignment = getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers)
+
+    # Get score
+    (nA, tA, tP, fP, fN, P, R, F) = getScore(issueAnalyzer, projectId, bugStatistics, issue_assignment)
+
+    # Print the result
+    printResult(issueAnalyzer, nA, tA, nPA, tP, fP, fN, P, R, F)
+
+    log.info("Analysis is terminated.")
+
+def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers):
+    """Function to calculate the result of developer-issue assignments
+
+    Get the aggregated data from database's views, make the
+    developer-issue assignments and store the result on database.
+
+    Args:
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
+        projectId (int): The id of the current project
+
+    Returns None: The result is stored on database
+
+    """
+    conf = issueAnalyzer.conf
+    dbm = DBManager(conf)
+
+    timeIncrement = conf["issueAnalyzerTimeIncrement"]
+    coeffAvailability = conf["issueAnalyzerAvailability"]
+    coeffCollaborativity = conf["issueAnalyzerCollaborativity"]
+    coeffCompetency = conf["issueAnalyzerCompetency"]
+    coeffProductivity = conf["issueAnalyzerProductivity"]
+    coeffReliability = conf["issueAnalyzerReliability"]
 
     # Get all the bugs and their possible developers
     assignmentResults = dict()
@@ -726,7 +760,8 @@ def getResult(issueAnalyzer, projectId):
             
             timeAssignments = developerTimeAssignments[developer] if developer in developerTimeAssignments.keys() else 0
             #log.info(str("DEV: {} TIME ASSIGNMENTS: {}").format(developer, timeAssignments))
-            developerBusy = timeIncrement*float(timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"])-float(timeUnavailable+timeAssignments) <= 0
+            developerBusy = timeIncrement*float(timeAvailable*conf["issueAnalyzerBugOpenedDays"]/conf["issueAnalyzerBugFixedDays"]) - \
+                            float(timeUnavailable+timeAssignments) <= 0
             if not developerBusy:
                 # avgNumAssigned/numAssigned
                 availability = float(utils.safeDiv(avgNumAssigned, numAssigned, avgNumAssigned+1))
@@ -765,7 +800,7 @@ def getResult(issueAnalyzer, projectId):
                             del developerBusyDict[assignee]
                     
                     if SHOW_DEBUG:
-                        log.info(str("Bug {} assigned to {} with rank {} (avail.: {}, coll.: {}, comp.: {}, produc.: {}, reliab.: {})").format(
+                        log.info(str("Bug {} assigned to {} with rank {} (Availability: {}, Collaborativity: {}, Competency: {}, Productivity: {}, Reliability: {})").format(
                             bug,dev["developer"],rank,availability,collaborativity,competency,productivity,reliability))
 
                     # Set new assignee
@@ -780,7 +815,7 @@ def getResult(issueAnalyzer, projectId):
                     timeAssignments = timeAssignments+assigneeTime
                     developerTimeAssignments[developer] = timeAssignments
                 elif SHOW_DEBUG:
-                    log.info(str("Bug {} not assigned to {} with rank {} (avail.: {}, coll.: {}, comp.: {}, produc.: {}, reliab.: {})").format(
+                    log.info(str("Bug {} not assigned to {} with rank {} (Availability: {}, Collaborativity: {}, Competency: {}, Productivity: {}, Reliability: {})").format(
                         bug,dev["developer"],rank,availability,collaborativity,competency,productivity,reliability))
             else:
                 # Add developer to busy dict
@@ -791,25 +826,76 @@ def getResult(issueAnalyzer, projectId):
             assignmentResults[bug] = {"developer": assignee, "rank": assigneeRank, "assigned": assigneeNumAssigned}
             issue_assignment.append((bug, projectId, assignee))
 
+    return issue_assignment
+
+def getScore(issueAnalyzer, projectId, bugStatistics, issue_assignment):
+    """Function to calculate the score of given result
+
+    Get the project's data and calculate the score.
+
+    Args:
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
+        projectId (int): The id of the current project
+
+    Returns:
+        nA  (int): number of assigned bugs
+        tA  (int): total number to be assigned
+        tP  (int): true positive value
+        fP  (int): false positive value
+        fN  (int): false negative value
+        P   (int): Precision value
+        R   (int): Recall value
+        F   (int): FMeasure value
+    """
+    conf = issueAnalyzer.conf
+    dbm = DBManager(conf)
+
+    nA = len(issue_assignment)
+    tA = len(bugStatistics)
+    tP = 0
+    fP = 0
+    fN = 0
+    P = 0
+    R = 0
+    F = 0
+
     # Store the assignees on database
     dbm.add_issue_assignment(issue_assignment)
-    log.info(str("Bug assigned: {} of {}. Possible assignments: {}.").format(len(assignmentResults), len(bugStatistics), nAssignmentResult))
 
-    # Check the degree of compliance
+    # If runMode is TEST, check the degree of compliance
     if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
         realityCheckResult = dbm.get_view_reality_check(projectId)
-        (truePositive, falsePositive, falseNegative)= realityCheckResult.fetchone()
+        (tP, fP, fN)= realityCheckResult.fetchone()
 
         # Calculate the Precision, Recall and FMeasure values
-        P = truePositive/float(truePositive+falseNegative)
-        R = truePositive/float(truePositive+falsePositive)
-        F = 0
-        if P+R>0:
-            F = 2*P*R/(P+R)
+        P = utils.safeDiv(tP, float(tP+fN), 0)
+        R = utils.safeDiv(tP, float(tP+fP), 0)
+        F = utils.safeDiv(2*P*R, P+R, 0)
 
-        log.info(str("Reality check assignments values: TruePositive: {} - FalsePositive: {} - FalseNegative: {} - Precision: {} - Recall: {} - FMeasure: {}.").format(
-            truePositive, falsePositive, falseNegative, round(P,2), round(R,2), round(F,2)))
+    return (nA, tA, tP, fP, fN, P, R, F)
 
-    log.info("Analysis is terminated.")
-    log.info(str("{} {} {} {} {}").format(conf["issueAnalyzerAvailability"],conf["issueAnalyzerCollaborativity"],conf["issueAnalyzerCompetency"], \
-                                          conf["issueAnalyzerProductivity"],conf["issueAnalyzerReliability"]))
+def printResult(issueAnalyzer, nA, tA, nPA, tP, fP, fN, P, R, F):
+    """Function to print the result
+
+    Get the project's data and print the result.
+
+    Args:
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
+        nA  (int): number of assigned bugs
+        tA  (int): total number to be assigned
+        tP  (int): true positive value
+        fP  (int): false positive value
+        fN  (int): false negative value
+        P   (int): Precision value
+        R   (int): Recall value
+        F   (int): FMeasure value
+
+    Returns None: The results are printed
+
+    """
+    log.info(str("Bug assigned: {} of {}. Possible assignments: {}.").format(nA, tA, nPA))
+
+    # If runMode is TEST, check the degree of compliance
+    if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
+        log.info(str("Reality check assignments values: TruePositive: {} - FalsePositive: {} - FalseNegative: {} - " \
+                     "Precision: {} - Recall: {} - FMeasure: {}.").format(tP, fP, fN, round(P,2), round(R,2), round(F,2)))

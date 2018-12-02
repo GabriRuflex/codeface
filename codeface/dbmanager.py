@@ -614,7 +614,6 @@ class DBManager:
         """
         Get the developers' assignment real check data related to the project.
         """
-        sqlQuery = ""
         sqlQuery = "select TP, FP, FN " \
                    "from view_reality_check where projectId = {}".format(projectId)
         self.doExec(sqlQuery)
