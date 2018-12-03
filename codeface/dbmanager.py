@@ -612,8 +612,15 @@ class DBManager:
         """
         sqlQuery = ""
         if queryType == utils.QUERY_TYPE_ALL_ASSIGNMENTS:
-            sqlQuery = "SELECT * FROM view_assignment \
-                    WHERE projectId={}".format(projectId)
+            sqlQuery = "SELECT issueId, projectId, component, priority, severity, developerName, isOpen, positiveReviews, " \
+                       "issueAssigned, numAttachmentPosted, numCommentPosted, sizeAttachmentPosted, devAvgTime, bugAvgETA, " \
+                       "priorityValue, severityValue, numBlockedIssues, votes, developersInterested, pendingTime " \
+                       "FROM view_assignment " \
+                       "WHERE projectId={} " \
+                       "ORDER BY projectId asc, priorityValue asc, severityValue asc, numBlockedIssues desc, votes desc, " \
+                       "developersInterested desc, pendingTime desc, component asc, isOpen asc, " \
+                       "positiveReviews desc, issueAssigned desc, numAttachmentPosted desc, numCommentPosted desc, " \
+                       "sizeAttachmentPosted desc, devAvgTime asc, bugAvgETA asc".format(projectId)
         elif queryType == utils.QUERY_TYPE_ASSIGNMENTS_STATS:
             sqlQuery = "select issueId, component, priority, severity, avg(issueAssigned) as 'avgIssueAssigned', avg(devAvgTime) as 'avgDevAvgTime', " \
                     "avg(numCommentPosted) as 'avgNumCommentPosted', avg(numAttachmentPosted) as 'avgNumAttachmentPosted', " \

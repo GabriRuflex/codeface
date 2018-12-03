@@ -617,11 +617,12 @@ def handleResult(issueAnalyzer, projectId):
     
     # Get all the bugs and their possible developers
     bugAssignments = dict()
+    bugOrder = list()
     developers = dict()
     result = dbm.get_view_assignment(projectId, utils.QUERY_TYPE_ALL_ASSIGNMENTS)
     nPA = result.rowcount
     row = result.fetchone()
-    while row is not None:        
+    while row is not None:
         bugId = row[BUG_ID]
         component = row[COMPONENT]
         priority = row[PRIORITY]
@@ -638,6 +639,7 @@ def handleResult(issueAnalyzer, projectId):
         
         if not bugId in bugAssignments.keys():
             # First entry on bug
+            bugOrder.append(bugId)
             bugAssignments[bugId] = [{"component": component, "priority": priority, "developer": developer, "isOpen": isOpen}]
         else:
             # Get the developers associated to the bug
@@ -649,6 +651,9 @@ def handleResult(issueAnalyzer, projectId):
                                                                                      "bugAvgETA": bugAvgETA}
 
         row = result.fetchone()
+
+    # Add the order list to the dict
+    bugAssignments["order"] = bugOrder
 
     # Get the results
     issue_assignment = getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers)
@@ -662,11 +667,11 @@ def handleResult(issueAnalyzer, projectId):
     # If runMode is TEST, make also a grid search to optimize qualities
     if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
         # Create parameters to test
-        gridSearchParameters = {"coeffAvailability": [i for i in range(0, 2)], #2
-                                "coeffCollaborativity": [i for i in range(0, 2)], #4
-                                "coeffCompetency": [i for i in range(0, 2)], #5
-                                "coeffProductivity": [i for i in range(0, 2)], #2
-                                "coeffReliability": [i for i in range(0, 2)]} #6
+        gridSearchParameters = {"coeffAvailability": [i for i in range(0, 2)],
+                                "coeffCollaborativity": [i for i in range(0, 2)],
+                                "coeffCompetency": [i for i in range(0, 2)],
+                                "coeffProductivity": [i for i in range(0, 2)],
+                                "coeffReliability": [i for i in range(0, 2)]}
         gridSearchList = generateCoefficientList(gridSearchParameters)
 
         bestScore = 0
@@ -688,8 +693,8 @@ def handleResult(issueAnalyzer, projectId):
 
         log.info(str("Best score (FMeasure): {} with coeffAvailability: {}, coeffCollaborativity: {}, " \
                      "coeffCompetency: {}, coeffProductivity: {} coeffReliability: {}.").format(
-                         round(bestScore,2), bestCoefficients["coeffAvailability"], bestCoefficients["coeffCollaborativity"],
-                         bestCoefficients["coeffCompetency"], bestCoefficients["coeffProductivity"], bestCoefficients["coeffReliability"]))
+                         round(bestScore,2), bestCoefficients["coeffAvailability"]/float(10), bestCoefficients["coeffCollaborativity"]/float(10),
+                         bestCoefficients["coeffCompetency"]/float(10), bestCoefficients["coeffProductivity"]/float(10), bestCoefficients["coeffReliability"]/float(10)))
 
     log.info("Analysis is terminated.")
 
@@ -707,7 +712,8 @@ def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developer
         developers (dict)    : a dict that contains developers' data
         differentCoeff (dict): a dict that contains a set of coefficients
 
-    Returns None: The result is stored on database
+    Returns:
+        issue_assignment (dict): a set of assignments
 
     """
     conf = issueAnalyzer.conf
@@ -728,12 +734,15 @@ def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developer
         coeffProductivity = differentCoeff["coeffProductivity"]
         coeffReliability = differentCoeff["coeffReliability"]
 
+    # Get the bug order
+    bugOrder = bugAssignments["order"]
+
     # Get all the bugs and their possible developers
     assignmentResults = dict()
     issue_assignment = list()
     developerTimeAssignments = dict()
     developerBusyDict = dict()
-    for bug in bugAssignments.keys():
+    for bug in bugOrder:
         # Initialize the assignee variables
         assignee = None
         assigneeTime = 0
