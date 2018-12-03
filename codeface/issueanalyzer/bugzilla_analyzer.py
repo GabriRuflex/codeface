@@ -360,7 +360,7 @@ def analyzeAndImport(issueAnalyzer):
     Args:
        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
 
-    Returns None: The result is stored on database
+    Returns None: The result is stored on database.
 
     """
     analysisMode = "analysis" if issueAnalyzer.runMode == utils.RUN_MODE_ANALYSIS else "test"
@@ -578,9 +578,11 @@ def handleResult(issueAnalyzer, projectId):
         issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
         projectId (int): The id of the current project
 
-    Returns None: The result is handled, the score is calculated and printed
+    Returns None: The result is handled, the score is calculated and printed.
 
     """
+    import codeface.issueanalyzer.gridtest as gridtest
+
     conf = issueAnalyzer.conf
     dbm = DBManager(conf)
 
@@ -657,9 +659,41 @@ def handleResult(issueAnalyzer, projectId):
     # Print the result
     printResult(issueAnalyzer, nA, tA, nPA, tP, fP, fN, P, R, F)
 
+    # If runMode is TEST, make also a grid search to optimize qualities
+    if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
+        # Create parameters to test
+        gridSearchParameters = {"coeffAvailability": [i for i in range(0, 2)], #2
+                                "coeffCollaborativity": [i for i in range(0, 2)], #4
+                                "coeffCompetency": [i for i in range(0, 2)], #5
+                                "coeffProductivity": [i for i in range(0, 2)], #2
+                                "coeffReliability": [i for i in range(0, 2)]} #6
+        gridSearchList = generateCoefficientList(gridSearchParameters)
+
+        bestScore = 0
+        bestCoefficients = {"coeffAvailability": 0, "coeffCollaborativity": 0,
+                            "coeffCompetency": 0, "coeffProductivity": 0, "coeffReliability": 0}
+        
+        # Search best score
+        log.info("Looking for the best coefficients to use...")
+        while bool(gridSearchList):
+            # Get new coefficients
+            coefficients = gridSearchList.pop()
+            # Get score for current coefficients
+            score = calculateScore(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, coefficients)
+
+            # Check best score
+            if score > bestScore:
+                bestScore = score
+                bestCoefficients = coefficients
+
+        log.info(str("Best score (FMeasure): {} with coeffAvailability: {}, coeffCollaborativity: {}, " \
+                     "coeffCompetency: {}, coeffProductivity: {} coeffReliability: {}.").format(
+                         round(bestScore,2), bestCoefficients["coeffAvailability"], bestCoefficients["coeffCollaborativity"],
+                         bestCoefficients["coeffCompetency"], bestCoefficients["coeffProductivity"], bestCoefficients["coeffReliability"]))
+
     log.info("Analysis is terminated.")
 
-def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers):
+def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, differentCoeff = {}):
     """Function to calculate the result of developer-issue assignments
 
     Get the aggregated data from database's views, make the
@@ -668,6 +702,10 @@ def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developer
     Args:
         issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
         projectId (int): The id of the current project
+        bugAssignments (dict): a dict that contains a set of possible assignments
+        bugStatistics (dict) : a dict that contains a set of bug's statistics
+        developers (dict)    : a dict that contains developers' data
+        differentCoeff (dict): a dict that contains a set of coefficients
 
     Returns None: The result is stored on database
 
@@ -681,6 +719,14 @@ def getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developer
     coeffCompetency = conf["issueAnalyzerCompetency"]
     coeffProductivity = conf["issueAnalyzerProductivity"]
     coeffReliability = conf["issueAnalyzerReliability"]
+
+    # Overwrite coefficients if needed
+    if differentCoeff <> {}:
+        coeffAvailability = differentCoeff["coeffAvailability"]
+        coeffCollaborativity = differentCoeff["coeffCollaborativity"]
+        coeffCompetency = differentCoeff["coeffCompetency"]
+        coeffProductivity = differentCoeff["coeffProductivity"]
+        coeffReliability = differentCoeff["coeffReliability"]
 
     # Get all the bugs and their possible developers
     assignmentResults = dict()
@@ -835,7 +881,9 @@ def getScore(issueAnalyzer, projectId, bugStatistics, issue_assignment):
 
     Args:
         issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
-        projectId (int): The id of the current project
+        projectId (int)        : The id of the current project
+        bugStatistics (dict)   : a dict that contains a set of bug's statistics
+        issue_assignment (dict): a dict that contains the assignments
 
     Returns:
         nA  (int): number of assigned bugs
@@ -899,3 +947,67 @@ def printResult(issueAnalyzer, nA, tA, nPA, tP, fP, fN, P, R, F):
     if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
         log.info(str("Reality check assignments values: TruePositive: {} - FalsePositive: {} - FalseNegative: {} - " \
                      "Precision: {} - Recall: {} - FMeasure: {}.").format(tP, fP, fN, round(P,2), round(R,2), round(F,2)))
+
+def deleteProjectAssignments(issueAnalyzer, projectId):
+    """Function to delete the project assignments
+
+    Args:
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
+        projectId (int): The id of the current project
+
+    Returns: None
+    """
+    conf = issueAnalyzer.conf
+    dbm = DBManager(conf)
+
+    dbm.delete_issue_assignment(projectId)
+
+def generateCoefficientList(gridSearchParameters):
+    """Function to generate a list of coefficients
+
+    It takes a dict and it converts the dict to a list.
+
+    Args:
+        gridSearchParameters (dict): a dictonary with the allowed coefficients
+
+    Returns:
+        coefficientList (list): a list of coefficients
+    """
+    # Create a new list
+    coefficientList = list()
+    # Calculate the coefficients and append to the list
+    for a in gridSearchParameters["coeffAvailability"]:
+        for b in gridSearchParameters["coeffCollaborativity"]:
+            for c in gridSearchParameters["coeffCompetency"]:
+                for d in gridSearchParameters["coeffProductivity"]:
+                    for e in gridSearchParameters["coeffReliability"]:
+                        coefficientList.append({"coeffAvailability": a, "coeffCollaborativity": b, "coeffCompetency": c,
+                                                "coeffProductivity": d, "coeffReliability": e})
+    return coefficientList
+
+def calculateScore(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, coefficients):
+    """Function to calculate the score of a set of assignments
+
+    It takes a project, it deletes the current assignments, it makes a new one and it calculates the score of it.
+
+    Args:
+        issueAnalyzer (codeface.issueanalyzer.issueanalyzer_handler.IssueAnalyzer): IssueAnalyzer instance to handle
+        projectId (int): The id of the current project
+        bugAssignments (dict): a dict that contains a set of possible assignments
+        bugStatistics (dict) : a dict that contains a set of bug's statistics
+        developers (dict)    : a dict that contains developers' data
+        coefficients (dict)  : a dict that contains the current coefficients
+
+    Returns:
+        F (float): score of assignment
+    """
+    # Call Bugzilla Analyzer routines
+    deleteProjectAssignments(issueAnalyzer, projectId)
+    issue_assignment = getResult(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, coefficients)
+    (nA, tA, tP, fP, fN, P, R, F) = getScore(issueAnalyzer, projectId, bugStatistics, issue_assignment)
+
+    # Return F=0 if we didn't assign all bugs
+    if nA < tA:
+        F = 0
+
+    return F

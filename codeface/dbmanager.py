@@ -549,9 +549,23 @@ class DBManager:
                       "VALUES (%s, %s, %s)", issue_assignment)
         except mdb.MySQLError as e:
             if hasattr(e, 'message'):
-                log.debug("Error when inseriting history data. Message: {}".format(e.message))
+                log.debug("Error when inseriting assignment data. Message: {}".format(e.message))
             else:
-                log.debug("Error when inseriting history data")
+                log.debug("Error when inseriting assignment data")
+        return
+
+    def delete_issue_assignment(self, projectId):
+        """
+        Delete the assignments of the project.
+        """
+        try:
+            self.doExecCommit(str("DELETE FROM issue_assignment "
+                      "WHERE projectId={} ").format(projectId))
+        except mdb.MySQLError as e:
+            if hasattr(e, 'message'):
+                log.debug("Error when deleting assignment data. Message: {}".format(e.message))
+            else:
+                log.debug("Error when deleting assignment data")
         return
 
     def get_data_stored(self, projectId):
