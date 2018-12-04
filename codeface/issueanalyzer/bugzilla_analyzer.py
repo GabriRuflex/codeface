@@ -667,13 +667,14 @@ def handleResult(issueAnalyzer, projectId):
     # If runMode is TEST, make also a grid search to optimize qualities
     if issueAnalyzer.runMode == utils.RUN_MODE_TEST:
         # Create parameters to test
-        gridSearchParameters = {"coeffAvailability": [i for i in range(0, 2)],
-                                "coeffCollaborativity": [i for i in range(0, 2)],
-                                "coeffCompetency": [i for i in range(0, 2)],
-                                "coeffProductivity": [i for i in range(0, 2)],
-                                "coeffReliability": [i for i in range(0, 2)]}
+        gridSearchParameters = {"coeffAvailability": [i for i in range(0, 4)],
+                                "coeffCollaborativity": [i for i in range(0, 4)],
+                                "coeffCompetency": [i for i in range(0, 3)],
+                                "coeffProductivity": [i for i in range(0, 3)],
+                                "coeffReliability": [i for i in range(0, 3)]}
         gridSearchList = generateCoefficientList(gridSearchParameters)
 
+        bestValues = (0, 0, 0, 0, 0, 0, 0, 0)
         bestScore = 0
         bestCoefficients = {"coeffAvailability": 0, "coeffCollaborativity": 0,
                             "coeffCompetency": 0, "coeffProductivity": 0, "coeffReliability": 0}
@@ -684,17 +685,19 @@ def handleResult(issueAnalyzer, projectId):
             # Get new coefficients
             coefficients = gridSearchList.pop()
             # Get score for current coefficients
-            score = calculateScore(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, coefficients)
+            (nA, tA, tP, fP, fN, P, R, score) = calculateScore(issueAnalyzer, projectId, bugAssignments, bugStatistics, developers, coefficients)
 
             # Check best score
             if score > bestScore:
+                bestValues = (nA, tA, tP, fP, fN, P, R, score)
                 bestScore = score
                 bestCoefficients = coefficients
 
-        log.info(str("Best score (FMeasure): {} with coeffAvailability: {}, coeffCollaborativity: {}, " \
-                     "coeffCompetency: {}, coeffProductivity: {} coeffReliability: {}.").format(
-                         round(bestScore,2), bestCoefficients["coeffAvailability"]/float(10), bestCoefficients["coeffCollaborativity"]/float(10),
-                         bestCoefficients["coeffCompetency"]/float(10), bestCoefficients["coeffProductivity"]/float(10), bestCoefficients["coeffReliability"]/float(10)))
+        log.info(str("Best score (FMeasure): {} (TP: {}, FP: {}, FN: {}, P: {}, R: {}, with coeffAvailability: {}, coeffCollaborativity: {}, " \
+                     "coeffCompetency: {}, coeffProductivity: {} coeffReliability: {} on n: {}/{}.").format(
+                         round(bestScore,2), bestValues[2], bestValues[3], bestValues[4], bestValues[5], bestValues[6], bestCoefficients["coeffAvailability"]/float(10),
+                         bestCoefficients["coeffCollaborativity"]/float(10), bestCoefficients["coeffCompetency"]/float(10), bestCoefficients["coeffProductivity"]/float(10),
+                         bestCoefficients["coeffReliability"]/float(10),  bestValues[0], bestValues[1]))
 
     log.info("Analysis is terminated.")
 
@@ -1019,4 +1022,4 @@ def calculateScore(issueAnalyzer, projectId, bugAssignments, bugStatistics, deve
     if nA < tA:
         F = 0
 
-    return F
+    return (nA, tA, tP, fP, fN, P, R, F)
