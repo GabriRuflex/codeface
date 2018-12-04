@@ -1542,7 +1542,7 @@ CREATE TABLE IF NOT EXISTS `codeface`.`view_developer` (`developerName` INT, `pr
 -- -----------------------------------------------------
 -- Placeholder table for view `codeface`.`view_assignment`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `codeface`.`view_assignment` (`issueId` INT, `projectId` INT, `component` INT, `priority` INT, `severity` INT, `developerName` INT, `isOpen` INT, `positiveReviews` INT, `issueAssigned` INT, `numAttachmentPosted` INT, `numCommentPosted` INT, `sizeAttachmentPosted` INT, `'devAvgTime'` INT, `bugAvgETA` INT);
+CREATE TABLE IF NOT EXISTS `codeface`.`view_assignment` (`issueId` INT, `projectId` INT, `component` INT, `priority` INT, `severity` INT, `developerName` INT, `isOpen` INT, `positiveReviews` INT, `issueAssigned` INT, `numAttachmentPosted` INT, `numCommentPosted` INT, `sizeAttachmentPosted` INT, `'devAvgTime'` INT, `bugAvgETA` INT, `priorityValue` INT, `severityValue` INT, `numBlockedIssues` INT, `votes` INT, `developersInterested` INT, `pendingTime` INT);
 
 -- -----------------------------------------------------
 -- Placeholder table for view `codeface`.`view_reality_check`
@@ -1727,7 +1727,8 @@ USE `codeface`;
 CREATE OR REPLACE VIEW `view_assignment` AS
 
 SELECT b.issueId, b.projectId, b.component, b.priority, b.severity, d.developerName, d.isOpen, d.positiveReviews,
-		d.issueAssigned, d.numAttachmentPosted, d.numCommentPosted, d.sizeAttachmentPosted, df.avgTime as 'devAvgTime', dr.bugAvgETA
+		d.issueAssigned, d.numAttachmentPosted, d.numCommentPosted, d.sizeAttachmentPosted, df.avgTime as 'devAvgTime', dr.bugAvgETA,
+        b.priorityValue, b.severityValue, b.numBlockedIssues, b.votes, b.developersInterested, b.pendingTime
 FROM
 		view_bug b
         JOIN view_developer d ON (b.projectId = d.projectId AND b.component = d.component)
