@@ -21,15 +21,12 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get -qqy install sinntp texlive default-
 # Make sure that the mysql socket file is available as /var/run/mysqld/mysqld.sock
 # and /tmp/mysql.sock.
 # HACK: Remove this hack once R, python and node.js try to access the same file.
-version=`lsb_release -r | awk '{ print $2;}'`
-if [ "${version}" = "16.04" ]; then
-    sudo sed -i "s/\/var\/run\/mysqld\/mysqld.sock/\/tmp\/mysql.sock/g;" /etc/mysql/mysql.conf.d/mysqld.cnf
-    sudo service mysql restart # Deleted /var/run/mysqld, so restart before creating the link
-    sudo ln -s /tmp/mysql.sock /var/run/mysqld/mysqld.sock
-fi
+sudo sed -i "s/\/var\/run\/mysqld\/mysqld.sock/\/tmp\/mysql.sock/g;" /etc/mysql/mysql.conf.d/mysqld.cnf
+sudo service mysql restart # Deleted /var/run/mysqld, so restart before creating the link
+sudo ln -s /tmp/mysql.sock /var/run/mysqld/mysqld.sock
 
 ## Make sure that the nodejs binary exists.
 ## HACK: Make a symlink from the node binary.
-if ! type "nodejs" &> /dev/null; then
+if ! [ -x "$(command -v nodejs)" ]; then
     sudo ln -s /usr/bin/node /usr/bin/nodejs
 fi

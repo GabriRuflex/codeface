@@ -5,7 +5,7 @@
 # Copyright Wolfgang Mauerer <wolfgang.mauerer@oth-regensburg.de>
 # SPDX-License-Identifier:	Apache-2.0 BSD-2-Clause GPL-2.0+ MIT WTFPL
 
-export CPPSTATS_VERSION=0.9.3
+export CPPSTATS_VERSION=0.9.4
 
 echo "Providing cppstats $CPPSTATS_VERSION"
 
